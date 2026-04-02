@@ -407,8 +407,7 @@ function gridColor() { return isDark() ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,
 
 // ─── CARGA DESDE GOOGLE SHEETS ───────────────────────────────────────────────
 async function loadSheets() {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
-  try {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
     const resp = await fetch(url);
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const csv = await resp.text();
