@@ -490,7 +490,7 @@ function parseCSV(csv) {
 
     let montoStr = get(ci.monto);
     const negativo = montoStr.includes('(') && montoStr.includes(')');
-    montoStr = montoStr.replace(/[()]/g,'').replace(/,/g,'').trim();
+    montoStr = montoStr.replace(/[()]/g,'').replace(/\./g,'').replace(',','.').trim();
     let monto = parseFloat(montoStr);
     if (isNaN(monto)) continue;
     if (negativo) monto = -monto;
