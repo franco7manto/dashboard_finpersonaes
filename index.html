@@ -43,9 +43,9 @@
     /* WIDGET BAR */
     .widget-bar { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px 16px; margin-bottom:1.5rem; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
     .widget-bar-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.8px; margin-right:4px; white-space:nowrap; }
-    .widget-toggle { font-family:'DM Sans',sans-serif; font-size:12px; padding:5px 12px; border-radius:99px; border:1px solid var(--border2); background:transparent; color:var(--muted); cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+    .widget-toggle { font-family:'Inter',sans-serif; font-size:12px; padding:5px 12px; border-radius:99px; border:1px solid var(--border2); background:transparent; color:#f0f4f8; cursor:pointer; transition:all 0.15s; white-space:nowrap; }
     .widget-toggle.on { background:var(--accent); border-color:var(--accent); color:#fff; }
-    .widget-toggle:hover:not(.on) { border-color:var(--accent); color:var(--text); }
+    .widget-toggle:hover:not(.on) { border-color:#f0f4f8; color:#f0f4f8; }
 
     /* HEADER */
     .header { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem; }
@@ -64,17 +64,17 @@
 
     /* CARDS */
     .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:1.5rem; }
-    .metric { background:var(--surface); padding:18px 20px; border-top:2px solid var(--accent-color); border-left:1px solid var(--border); border-right:1px solid var(--border); border-bottom:1px solid var(--border); border-radius:0 0 var(--radius) var(--radius); }
-    .metric-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:10px; }
-    .metric-value { font-size:26px; font-weight:600; letter-spacing:-1px; font-family:'DM Mono',monospace; }
+    .metric { background:#f0f4f8; padding:18px 20px; border-top:2px solid var(--accent-color); border-left:1px solid rgba(13,27,46,0.1); border-right:1px solid rgba(13,27,46,0.1); border-bottom:1px solid rgba(13,27,46,0.1); border-radius:0 0 var(--radius) var(--radius); color:#0d1b2e; }
+    .metric-label { font-size:11px; color:#5a6e84; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:10px; }
+    .metric-value { font-size:26px; font-weight:600; letter-spacing:-1px; font-family:'DM Mono',monospace; color:#0d1b2e; }
     .metric-sub { font-size:11px; margin-top:6px; }
 
-    .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.25rem 1.5rem; transition:background 0.2s; }
-    .card-title { font-size:12px; font-weight:500; color:var(--muted); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:1rem; }
+    .card { background:#f0f4f8; border:1px solid rgba(13,27,46,0.1); border-radius:var(--radius); padding:1.25rem 1.5rem; transition:background 0.2s; color:#0d1b2e; }
+    .card-title { font-size:12px; font-weight:500; color:#5a6e84; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:1rem; }
     .card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:8px; }
     .chart-wrap { position:relative; width:100%; }
     .legend { display:flex; flex-wrap:wrap; gap:14px; margin-top:14px; }
-    .legend-item { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
+    .legend-item { display:flex; align-items:center; gap:6px; font-size:12px; color:#5a6e84; }
     .legend-dot { width:8px; height:8px; border-radius:2px; flex-shrink:0; }
 
     .charts-row2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:1.5rem; }
@@ -449,8 +449,8 @@ let filteredMonth = '';
 const fmt$ = v => '$' + Math.round(v).toLocaleString('es-AR');
 const pct  = (a,b) => b === 0 ? '—' : (a/b*100).toFixed(1) + '%';
 function isDark() { return document.documentElement.getAttribute('data-theme') === 'dark'; }
-function tickColor() { return isDark() ? '#7a7f96' : '#9a9faa'; }
-function gridColor() { return isDark() ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)'; }
+function tickColor() { return '#5a6e84'; }
+function gridColor() { return 'rgba(13,27,46,0.07)'; }
 
 // ─── CARGA DESDE GOOGLE SHEETS ───────────────────────────────────────────────
 async function loadSheets() {
