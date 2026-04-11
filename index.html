@@ -1,28 +1,36 @@
 <!DOCTYPE html>
-<html lang="es" data-theme="light">
+<html lang="es" data-theme="dark">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Dashboard de Gastos</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     [data-theme="dark"] {
-      --bg:#0f1117; --surface:#181c27; --surface2:#1e2333;
-      --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.12);
-      --text:#e8eaf0; --muted:#7a7f96;
+      --bg:#0d1b2e; --surface:#122040; --surface2:#1a2d4a;
+      --border:rgba(240,244,248,0.08); --border2:rgba(240,244,248,0.15);
+      --text:#f0f4f8; --muted:#7a90a8;
     }
     [data-theme="light"] {
-      --bg:#f4f5f7; --surface:#ffffff; --surface2:#f0f1f4;
-      --border:rgba(0,0,0,0.08); --border2:rgba(0,0,0,0.14);
-      --text:#1a1d2e; --muted:#7a7f96;
+      --bg:#f0f4f8; --surface:#ffffff; --surface2:#e4eaf2;
+      --border:rgba(13,27,46,0.09); --border2:rgba(13,27,46,0.16);
+      --text:#0d1b2e; --muted:#5a6e84;
     }
-    :root { --accent:#4f83f7; --red:#f7614f; --green:#4fd17a; --amber:#f7c04f; --purple:#a07cf7; --teal:#4fd1c5; --radius:14px; --radius-sm:8px; }
+    :root {
+      --accent:#8b1a2e;
+      --red:#c0392b;
+      --green:#2a9d5c;
+      --amber:#d4a017;
+      --purple:#5a4a8a;
+      --teal:#2a6e7a;
+      --radius:14px; --radius-sm:8px;
+    }
 
     html { background:var(--bg); }
-    body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:2rem 1.5rem; max-width:1200px; margin:0 auto; transition:background 0.2s,color 0.2s; }
+    body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:2rem 1.5rem; max-width:1200px; margin:0 auto; transition:background 0.2s,color 0.2s; }
 
     /* LOADING */
     #loadingOverlay { position:fixed; inset:0; background:var(--bg); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; }
@@ -176,7 +184,7 @@
     <p id="headerSub">Cargando…</p>
   </div>
   <div class="header-right">
-    <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">☾ Modo oscuro</button>
+    <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">☀ Modo claro</button>
     <select id="selAnio" onchange="applyFilters()"><option value="">Todos los años</option></select>
     <div class="drop-wrap" id="mesDrop">
       <button class="drop-btn" onclick="toggleDrop('ddMes')">Meses: <span id="mesBadge" style="font-size:11px;color:var(--muted)">Todos ▾</span></button>
@@ -206,27 +214,27 @@
 <!-- MÉTRICAS -->
 <div class="widget-section mb" id="w-metrics">
   <div class="metrics">
-    <div class="metric" style="--accent-color:var(--red)">
+    <div class="metric" style="--accent-color:#c0392b">
       <div class="metric-label">Gasto total</div>
       <div class="metric-value" id="mGasto">—</div>
       <div class="metric-sub" id="mGastoPct" style="color:var(--muted)">—</div>
     </div>
-    <div class="metric" style="--accent-color:var(--green)">
+    <div class="metric" style="--accent-color:#2a9d5c">
       <div class="metric-label">Ingreso total</div>
       <div class="metric-value" id="mIngreso">—</div>
-      <div class="metric-sub" id="mIngresoPct" style="color:var(--green)">—</div>
+      <div class="metric-sub" id="mIngresoPct" style="color:#2a9d5c">—</div>
     </div>
-    <div class="metric" style="--accent-color:var(--amber)">
+    <div class="metric" style="--accent-color:#d4a017">
       <div class="metric-label">Ahorro neto</div>
       <div class="metric-value" id="mAhorro">—</div>
       <div class="metric-sub" id="mAhorroPct" style="color:var(--muted)">—</div>
     </div>
-    <div class="metric" style="--accent-color:var(--purple)">
+    <div class="metric" style="--accent-color:#5a4a8a">
       <div class="metric-label">Meses con datos</div>
       <div class="metric-value" id="mMeses">—</div>
       <div class="metric-sub" id="mMesesSub" style="color:var(--muted)">—</div>
     </div>
-    <div class="metric" style="--accent-color:var(--teal)">
+    <div class="metric" style="--accent-color:#8b6bb5">
       <div class="metric-label">Inversiones</div>
       <div class="metric-value" id="mInv">—</div>
       <div class="metric-sub" id="mInvPct" style="color:var(--muted)">—</div>
@@ -240,10 +248,10 @@
   <div class="chart-wrap" style="height:240px"><canvas id="c1"></canvas></div>
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:14px;">
     <div class="legend">
-      <div class="legend-item"><span class="legend-dot" style="background:#4f83f7"></span>Ingresos</div>
-      <div class="legend-item"><span class="legend-dot" style="background:#e03030"></span>Gastos</div>
-      <div class="legend-item"><span class="legend-dot" style="background:#f7c04f;border-radius:0"></span>Ahorro</div>
-      <div class="legend-item"><span class="legend-dot" style="background:#4fd1c5;border-radius:0"></span>Inversión</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#2a9d5c"></span>Ingresos</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#c0392b"></span>Gastos</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#d4a017;border-radius:0"></span>Ahorro</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#8b6bb5;border-radius:0"></span>Inversión</div>
     </div>
     <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;">
       <input type="checkbox" id="toggleAhorro" checked onchange="buildC1()"> Ahorro
@@ -408,19 +416,19 @@ const CAT_PALETTE = [
 
 // Colores fijos por categoría
 const CAT_COLOR_MAP = {
-  'Comida':      '#f79a4f',
-  'Transporte':  '#f7c04f',
-  'Bienestar':   '#7cf7a0',
-  'Vivienda':    '#8B5E3C',
-  'Educación':   '#4f83f7',
-  'Regalos':     '#f74fb0',
-  'Ocio':        '#a07cf7',
-  'Compras':     '#e03030',
-  'Finanzas':    '#2e7d4f',
-  'Otros':       '#888888',
+  'Comida':      '#c97a2a',
+  'Transporte':  '#d4a017',
+  'Bienestar':   '#2a9d5c',
+  'Vivienda':    '#7a4a28',
+  'Educación':   '#2a5a9d',
+  'Regalos':     '#9d2a6e',
+  'Ocio':        '#8b6bb5',
+  'Compras':     '#c0392b',
+  'Finanzas':    '#1a6b4a',
+  'Otros':       '#5a6e84',
   // ingresos
   'Sueldo':      '#1a3a6b',
-  'Aporte':      '#aab4c4',
+  'Aporte':      '#8a9eb5',
 };
 const CAT_COLOR = {};
 const CAT_BG    = {};
@@ -650,7 +658,7 @@ function renderMetrics() {
     document.getElementById('mGastoPct').textContent  = pct(totalGasto, totalIngreso) + ' del ingreso';
     document.getElementById('mIngresoPct').textContent = DATA_ING.length + ' transacciones';
     document.getElementById('mAhorroPct').textContent  = pct(ahorro, totalIngreso) + ' del ingreso';
-    document.getElementById('mAhorroPct').style.color  = ahorro >= 0 ? 'var(--green)' : 'var(--red)';
+    document.getElementById('mAhorroPct').style.color  = ahorro >= 0 ? '#2a9d5c' : '#c0392b';
     document.getElementById('mInvPct').textContent     = pct(totalInv, totalIngreso) + ' del ingreso';
   } else {
     document.getElementById('mGastoPct').textContent  = DATA.length + ' transacciones';
@@ -685,14 +693,14 @@ function buildC1() {
   const mostrarInversion = document.getElementById('toggleInversion')?.checked !== false;
 
   const datasets = [
-    {label:'Ingresos', data:ingresos, borderColor:'#4f83f7', backgroundColor:'transparent', tension:0.4, pointRadius:3, fill:false, borderWidth:2},
-    {label:'Gastos',   data:gastos,   borderColor:'#e03030', backgroundColor:'rgba(224,48,48,0.10)', tension:0.4, pointRadius:3, fill:true, borderWidth:2},
+    {label:'Ingresos',  data:ingresos,   borderColor:'#2a9d5c', backgroundColor:'rgba(42,157,92,0.10)',  tension:0.4, pointRadius:3, fill:false, borderWidth:2},
+    {label:'Gastos',    data:gastos,     borderColor:'#c0392b', backgroundColor:'rgba(192,57,43,0.12)',  tension:0.4, pointRadius:3, fill:true,  borderWidth:2},
   ];
   if (mostrarAhorro) {
-    datasets.push({label:'Ahorro', data:ahorros, borderColor:'#f7c04f', backgroundColor:'transparent', tension:0.4, pointRadius:3, fill:false, borderWidth:2, borderDash:[6,3]});
+    datasets.push({label:'Ahorro',    data:ahorros,    borderColor:'#d4a017', backgroundColor:'transparent', tension:0.4, pointRadius:3, fill:false, borderWidth:2, borderDash:[6,3]});
   }
   if (mostrarInversion) {
-    datasets.push({label:'Inversión', data:inversiones, borderColor:'#4fd1c5', backgroundColor:'transparent', tension:0.4, pointRadius:3, fill:false, borderWidth:2, borderDash:[3,3]});
+    datasets.push({label:'Inversión', data:inversiones,borderColor:'#8b6bb5', backgroundColor:'transparent', tension:0.4, pointRadius:3, fill:false, borderWidth:2, borderDash:[3,3]});
   }
 
   if (c1Chart) c1Chart.destroy();
@@ -1040,7 +1048,7 @@ function toggleTheme(){
   const dark=h.getAttribute('data-theme')==='dark';
   h.setAttribute('data-theme',dark?'light':'dark');
   document.getElementById('themeBtn').textContent=dark?'☾ Modo oscuro':'☀ Modo claro';
-  buildC1();buildC2();drawC3();renderAnalisis();
+  buildC1();buildC2();buildC3();renderAnalisis();
 }
 function toggleDrop(id){document.getElementById(id).classList.toggle('open');}
 document.addEventListener('click',e=>{if(!e.target.closest('.drop-wrap'))document.querySelectorAll('.dropdown').forEach(d=>d.classList.remove('open'));});
