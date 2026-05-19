@@ -501,12 +501,12 @@
     <div class="card-head">
       <span class="card-head-title">Evolución mensual — gastos vs ingresos</span>
       <div class="head-toggles">
+        <label><input type="checkbox" id="toggleInversion" checked onchange="buildC1()"> Inversión</label>
       </div>
     </div>
     <div class="card-body">
       <div class="chart-wrap" style="height:260px"><canvas id="c1"></canvas></div>
       <div class="legend">
-        <div class="legend-item"><span class="legend-dot" style="background:var(--teal-mid)"></span>Ingresos</div>
         <div class="legend-item"><span class="legend-dot" style="background:var(--teal-mid)"></span>Ingresos</div>
         <div class="legend-item"><span class="legend-dot" style="background:var(--teal-dark)"></span>Gastos</div>
         <div class="legend-item"><span class="legend-dot" style="background:var(--purple)"></span>Inversión</div>
@@ -883,13 +883,15 @@ function buildC1(){
   const gastos=keys.map(k=>Math.round(bk[k].gasto));
   const ingresos=keys.map(k=>Math.round(bk[k].ingreso));
   const inversiones=keys.map(k=>Math.round(bk[k].inversion));
+  const mI=document.getElementById('toggleInversion')?.checked!==false;
   const ds=[
     {label:'Ingresos',data:ingresos,type:'line',borderColor:'#1DBFAA',backgroundColor:'transparent',tension:0.35,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2.5},
-    {label:'Gastos',data:gastos,type:'line',borderColor:'#006B5F',backgroundColor:'transparent',tension:0.35,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2.5},
-    {label:'Inversión',data:inversiones,type:'bar',backgroundColor:'#6B4F9E',borderRadius:4}
+    {label:'Gastos',data:gastos,type:'line',borderColor:'#006B5F',backgroundColor:'transparent',tension:0.35,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2.5}
   ];
+  if (mI) ds.push({label:'Inversión',data:inversiones,type:'bar',backgroundColor:'#6B4F9E',borderRadius:4});
   if (c1Chart) c1Chart.destroy();
   c1Chart=new Chart(document.getElementById('c1'),{type:'bar',data:{labels,datasets:ds},options:{responsive:true,maintainAspectRatio:false,
+    layout:{padding:{left:10,right:10}},
     interaction:{mode:'index',intersect:false},
     plugins:{legend:{display:false},tooltip:{
       backgroundColor:'#1a1a1a',titleColor:'#fff',bodyColor:'#fff',padding:10,cornerRadius:6,titleFont:{size:12,weight:'500'},bodyFont:{size:13},
