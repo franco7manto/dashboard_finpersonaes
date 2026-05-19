@@ -501,16 +501,14 @@
     <div class="card-head">
       <span class="card-head-title">Evolución mensual — gastos vs ingresos</span>
       <div class="head-toggles">
-        <label><input type="checkbox" id="toggleAhorro" checked onchange="buildC1()"> Ahorro</label>
-        <label><input type="checkbox" id="toggleInversion" checked onchange="buildC1()"> Inversión</label>
       </div>
     </div>
     <div class="card-body">
       <div class="chart-wrap" style="height:260px"><canvas id="c1"></canvas></div>
       <div class="legend">
         <div class="legend-item"><span class="legend-dot" style="background:var(--teal-mid)"></span>Ingresos</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--teal-mid)"></span>Ingresos</div>
         <div class="legend-item"><span class="legend-dot" style="background:var(--teal-dark)"></span>Gastos</div>
-        <div class="legend-item"><span class="legend-dot" style="background:var(--yellow)"></span>Ahorro</div>
         <div class="legend-item"><span class="legend-dot" style="background:var(--purple)"></span>Inversión</div>
       </div>
     </div>
@@ -884,24 +882,20 @@ function buildC1(){
   const labels=keys.map(k=>{const[y,m]=k.split('-');return MESES_LABEL[parseInt(m)-1]+(YEARS.length>1?' '+y:'');});
   const gastos=keys.map(k=>Math.round(bk[k].gasto));
   const ingresos=keys.map(k=>Math.round(bk[k].ingreso));
-  const ahorros=keys.map(k=>Math.round(bk[k].ingreso-bk[k].gasto));
   const inversiones=keys.map(k=>Math.round(bk[k].inversion));
-  const mA=document.getElementById('toggleAhorro')?.checked!==false;
-  const mI=document.getElementById('toggleInversion')?.checked!==false;
   const ds=[
-    {label:'Ingresos',data:ingresos,borderColor:'#1DBFAA',backgroundColor:'transparent',tension:0.35,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2.5},
-    {label:'Gastos',data:gastos,borderColor:'#006B5F',backgroundColor:'transparent',tension:0.35,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2.5},
+    {label:'Ingresos',data:ingresos,type:'line',borderColor:'#1DBFAA',backgroundColor:'transparent',tension:0.35,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2.5},
+    {label:'Gastos',data:gastos,type:'line',borderColor:'#006B5F',backgroundColor:'transparent',tension:0.35,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2.5},
+    {label:'Inversión',data:inversiones,type:'bar',backgroundColor:'#6B4F9E',borderRadius:4}
   ];
-  if (mA) ds.push({label:'Ahorro',data:ahorros,borderColor:'#FFB81C',backgroundColor:'transparent',tension:0.35,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2.5});
-  if (mI) ds.push({label:'Inversión',data:inversiones,borderColor:'#6B4F9E',backgroundColor:'transparent',tension:0.35,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2.5,borderDash:[4,3]});
   if (c1Chart) c1Chart.destroy();
-  c1Chart=new Chart(document.getElementById('c1'),{type:'line',data:{labels,datasets:ds},options:{responsive:true,maintainAspectRatio:false,
+  c1Chart=new Chart(document.getElementById('c1'),{type:'bar',data:{labels,datasets:ds},options:{responsive:true,maintainAspectRatio:false,
     interaction:{mode:'index',intersect:false},
     plugins:{legend:{display:false},tooltip:{
       backgroundColor:'#1a1a1a',titleColor:'#fff',bodyColor:'#fff',padding:10,cornerRadius:6,titleFont:{size:12,weight:'500'},bodyFont:{size:13},
       callbacks:{label:ctx=>' '+ctx.dataset.label+': '+fmt$(ctx.parsed.y)}}},
     scales:{
-      y:{ticks:{callback:v=>{const m=v/1000000;return m===Math.round(m)&&Math.abs(m)>=1?'$'+m+'M':'$'+(v/1000).toFixed(0)+'K';},font:{size:11,family:'Source Sans 3'},color:tickColor()},grid:{color:gridColor(),drawTicks:false},border:{display:false}},
+      y:{beginAtZero:true,ticks:{callback:v=>{const m=v/1000000;return m===Math.round(m)&&Math.abs(m)>=1?'$'+m+'M':'$'+(v/1000).toFixed(0)+'K';},font:{size:11,family:'Source Sans 3'},color:tickColor()},grid:{color:gridColor(),drawTicks:false},border:{display:false}},
       x:{ticks:{font:{size:11,family:'Source Sans 3'},color:tickColor()},grid:{display:false},border:{display:false}}}}});
 }
 
