@@ -244,6 +244,33 @@
     thead th:hover { color: var(--ink); }
     th.r, td.r { text-align: right; }
     th.c, td.c { text-align: center; }
+    /* filtros de columna estilo Excel */
+    .th-filter-wrap { position: relative; display: inline-flex; align-items: center; gap: 6px; }
+    .col-filter-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 18px; height: 18px; border-radius: 4px; border: none;
+      background: transparent; color: var(--muted); cursor: pointer; padding: 0;
+      font-size: 11px; line-height: 1; transition: all 0.12s;
+    }
+    .col-filter-btn:hover { background: var(--bg-muted); color: var(--teal-dark); }
+    .col-filter-btn.active { color: var(--teal-dark); background: rgba(0,107,95,0.12); }
+    .col-filter-panel {
+      display: none; position: absolute; left: 0; top: calc(100% + 8px);
+      background: var(--bg); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm); padding: 8px 0; min-width: 220px; max-width: 300px;
+      z-index: 300; box-shadow: 0 4px 16px rgba(16,24,40,0.12);
+      text-transform: none; font-weight: 400;
+    }
+    .col-filter-panel.open { display: block; }
+    .col-filter-search { width: calc(100% - 20px); margin: 0 10px 8px; font-size: 13px; padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--bg); color: var(--ink); outline: none; }
+    .col-filter-search:focus { border-color: var(--teal-dark); }
+    .col-filter-actions { display: flex; gap: 8px; padding: 0 10px 8px; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+    .col-filter-actions button { flex: 1; font-size: 11px; padding: 5px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--bg); color: var(--ink-soft); cursor: pointer; font-family: inherit; }
+    .col-filter-actions button:hover { border-color: var(--teal-dark); color: var(--teal-dark); }
+    .col-filter-list { max-height: 240px; overflow-y: auto; }
+    .col-filter-list label { display: flex; align-items: center; gap: 9px; padding: 6px 14px; font-size: 13px; color: var(--ink); cursor: pointer; white-space: nowrap; }
+    .col-filter-list label:hover { background: var(--bg-muted); }
+    .col-filter-list input[type="checkbox"] { accent-color: var(--teal-dark); flex-shrink: 0; }
     tbody tr { transition: background 0.1s; }
     tbody tr:hover { background: var(--bg-muted) !important; }
     tbody td {
@@ -547,8 +574,8 @@
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th onclick="sortTable('cat')">Categoría <span id="sortIconCat"></span></th>
-            <th onclick="sortTable('sub')">Subcategoría <span id="sortIconSub"></span></th>
+            <th><span class="th-filter-wrap"><span onclick="sortTable('cat')" style="cursor:pointer;">Categoría <span id="sortIconCat"></span></span><button class="col-filter-btn" id="filterBtnCat" onclick="toggleColFilter(event,'cat')" title="Filtrar">▾</button><div class="col-filter-panel" id="filterPanelCat"></div></span></th>
+            <th><span class="th-filter-wrap"><span onclick="sortTable('sub')" style="cursor:pointer;">Subcategoría <span id="sortIconSub"></span></span><button class="col-filter-btn" id="filterBtnSub" onclick="toggleColFilter(event,'sub')" title="Filtrar">▾</button><div class="col-filter-panel" id="filterPanelSub"></div></span></th>
             <th class="r" onclick="sortTable('total')">Total <span id="sortIconTotal">▼</span></th>
             <th class="r" onclick="sortTable('prom')">Prom. mensual <span id="sortIconProm"></span></th>
             <th class="r" onclick="sortTable('pct')">% del total <span id="sortIconPct"></span></th>
@@ -611,6 +638,18 @@
           <div class="chart-wrap" style="height:200px"><canvas id="cPie4"></canvas></div>
           <div class="legend" id="legPie4"></div>
         </div>
+      </div>
+      <div class="sub-sep"></div>
+      <div class="sub-title" id="anDetTitle">Detalle de transacciones</div>
+      <div class="table-wrap">
+        <table><thead><tr>
+          <th>Detalle</th>
+          <th class="r">Total</th>
+          <th class="r"># Transacciones</th>
+          <th class="r">% de la subcategoría</th>
+          <th class="r">% de la categoría</th>
+          <th class="r">% del gasto total</th>
+        </tr></thead><tbody id="anDetTbody"></tbody></table>
       </div>
     </div>
   </div>
@@ -699,6 +738,7 @@ const CAT_COLOR={}, CAT_BG={}, CAT_SHADES={};
 let RAW=[],DATA=[],DATA_ING=[],DATA_INV=[],YEARS=[],CATS=[];
 let filteredYear='';
 let tableSort={col:'total',asc:false};
+let tableFilters={cat:null,sub:null};
 
 const fmt$=v=>'$'+Math.round(v).toLocaleString('es-AR');
 const pct=(a,b)=>b===0?'—':(a/b*100).toFixed(1)+'%';
@@ -888,7 +928,7 @@ function buildC1(){
     {label:'Ingresos',data:ingresos,type:'line',borderColor:'#1DBFAA',backgroundColor:'transparent',tension:0.35,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2.5},
     {label:'Gastos',data:gastos,type:'line',borderColor:'#006B5F',backgroundColor:'transparent',tension:0.35,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2.5}
   ];
-  if (mI) ds.push({label:'Inversión',data:inversiones,type:'bar',backgroundColor:'#6B4F9E',borderRadius:4});
+  if (mI) ds.push({label:'Inversión',data:inversiones,type:'bar',backgroundColor:'#6B4F9E',borderRadius:4,barPercentage:0.4,categoryPercentage:0.4});
   if (c1Chart) c1Chart.destroy();
   c1Chart=new Chart(document.getElementById('c1'),{type:'bar',data:{labels,datasets:ds},options:{responsive:true,maintainAspectRatio:false,
     layout:{padding:{left:10,right:10}},
@@ -948,12 +988,76 @@ function sortTable(col){
   renderTable();
 }
 
+function colUniqueValues(col){
+  const set=new Set();
+  getSubData().forEach(r=>set.add(col==='cat'?r.cat:r.sub));
+  return [...set].sort((a,b)=>a.localeCompare(b));
+}
+
+function toggleColFilter(ev,col){
+  ev.stopPropagation();
+  const cap=col.charAt(0).toUpperCase()+col.slice(1);
+  const panel=document.getElementById('filterPanel'+cap);
+  const wasOpen=panel.classList.contains('open');
+  // cerrar todos los paneles primero
+  document.querySelectorAll('.col-filter-panel').forEach(p=>p.classList.remove('open'));
+  if (wasOpen) return;
+  buildColFilterPanel(col);
+  panel.classList.add('open');
+}
+
+function buildColFilterPanel(col){
+  const cap=col.charAt(0).toUpperCase()+col.slice(1);
+  const panel=document.getElementById('filterPanel'+cap);
+  const values=colUniqueValues(col);
+  const active=tableFilters[col];
+  const checked=v=>(active===null||active.includes(v));
+  panel.innerHTML=`
+    <input type="text" class="col-filter-search" placeholder="Buscar…" oninput="filterColOptions('${col}',this.value)"/>
+    <div class="col-filter-actions">
+      <button onclick="colFilterAll('${col}',true)">Todos</button>
+      <button onclick="colFilterAll('${col}',false)">Ninguno</button>
+    </div>
+    <div class="col-filter-list" id="filterList${cap}">
+      ${values.map(v=>`<label data-val="${v.replace(/"/g,'&quot;')}"><input type="checkbox" ${checked(v)?'checked':''} onchange="applyColFilter('${col}')"> ${v}</label>`).join('')}
+    </div>`;
+}
+
+function filterColOptions(col,q){
+  const cap=col.charAt(0).toUpperCase()+col.slice(1);
+  const list=document.getElementById('filterList'+cap);
+  const ql=q.toLowerCase();
+  [...list.querySelectorAll('label')].forEach(l=>{
+    l.style.display=l.dataset.val.toLowerCase().includes(ql)?'flex':'none';
+  });
+}
+
+function colFilterAll(col,checkAll){
+  const cap=col.charAt(0).toUpperCase()+col.slice(1);
+  const list=document.getElementById('filterList'+cap);
+  [...list.querySelectorAll('input[type=checkbox]')].forEach(cb=>{cb.checked=checkAll;});
+  applyColFilter(col);
+}
+
+function applyColFilter(col){
+  const cap=col.charAt(0).toUpperCase()+col.slice(1);
+  const list=document.getElementById('filterList'+cap);
+  const all=[...list.querySelectorAll('input[type=checkbox]')];
+  const selected=all.filter(cb=>cb.checked).map(cb=>cb.closest('label').dataset.val);
+  // si están todos seleccionados, el filtro queda inactivo (null)
+  tableFilters[col]=(selected.length===all.length)?null:selected;
+  document.getElementById('filterBtn'+cap).classList.toggle('active',tableFilters[col]!==null);
+  renderTable();
+}
+
 function renderTable(){
   const q=document.getElementById('searchInput').value.toLowerCase();
   const agrup=document.getElementById('toggleAgrupCat').checked;
   const mes=[...new Set(DATA.map(r=>r.year+'-'+r.month))].length||1;
   const tG=DATA.reduce((s,r)=>s+r.monto,0);
   let rows=getSubData().filter(r=>!q||r.cat.toLowerCase().includes(q)||r.sub.toLowerCase().includes(q));
+  if (tableFilters.cat) rows=rows.filter(r=>tableFilters.cat.includes(r.cat));
+  if (tableFilters.sub) rows=rows.filter(r=>tableFilters.sub.includes(r.sub));
   const {col,asc}=tableSort;
   rows.sort((a,b)=>{
     let va,vb;
@@ -1069,6 +1173,29 @@ function renderSubAnalisis(){
   cPie4Chart=new Chart(document.getElementById('cPie4'),{type:'doughnut',data:{labels:[subName,'Resto '+cat],datasets:[{data:[Math.round(subTotal),Math.round(catTotal-subTotal)],backgroundColor:[subColor,shades[(subIdx+1)%shades.length]+'66'],borderWidth:2,borderColor:'#ffffff',hoverOffset:4}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1a1a',titleColor:'#fff',bodyColor:'#fff',padding:10,cornerRadius:6,callbacks:{label:ctx=>` ${ctx.label}: ${fmt$(ctx.parsed)}`}}},cutout:'65%'}});
   document.getElementById('legPie4').innerHTML=`<div class="legend-item"><span class="legend-dot" style="background:${subColor}"></span>${subName} ${pct(subTotal,catTotal)}</div><div class="legend-item"><span class="legend-dot" style="background:${shades[(subIdx+1)%shades.length]+'66'}"></span>Resto ${pct(catTotal-subTotal,catTotal)}</div>`;
+
+  // Tabla de transacciones agrupadas por Detalle
+  document.getElementById('anDetTitle').textContent=`Detalle de transacciones — ${subName}`;
+  const subRows=catData.filter(r=>r.subcategoria===subName);
+  const detMap={};
+  subRows.forEach(r=>{
+    const d=r.detalle&&r.detalle.trim()?r.detalle.trim():'(Sin detalle)';
+    if (!detMap[d]) detMap[d]={total:0,count:0};
+    detMap[d].total+=r.monto;detMap[d].count++;
+  });
+  const dets=Object.keys(detMap).sort((a,b)=>detMap[b].total-detMap[a].total);
+  const dtb=document.getElementById('anDetTbody');dtb.innerHTML='';
+  dets.forEach((d,i)=>{
+    const o=detMap[d];const shade=shades[i%shades.length];
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td style="border-left:3px solid ${shade};">${d}</td>
+      <td class="r mono">${fmt$(o.total)}</td>
+      <td class="r mono" style="color:var(--muted);">${o.count}</td>
+      <td class="r mono" style="color:${shade};font-weight:500;">${pct(o.total,subTotal)}</td>
+      <td class="r mono" style="color:var(--muted);">${pct(o.total,catTotal)}</td>
+      <td class="r mono" style="color:var(--muted);">${pct(o.total,tG)}</td>`;
+    dtb.appendChild(tr);
+  });
 }
 
 const feState={meses:6,ajustados:{},ponderadores:{}};
@@ -1163,6 +1290,7 @@ function renderFeProgreso(objetivo){
 
 function toggleDrop(id){document.getElementById(id).classList.toggle('open');}
 document.addEventListener('click',e=>{if(!e.target.closest('.drop-wrap'))document.querySelectorAll('.dropdown').forEach(d=>d.classList.remove('open'));});
+document.addEventListener('click',e=>{if(!e.target.closest('.th-filter-wrap'))document.querySelectorAll('.col-filter-panel').forEach(p=>p.classList.remove('open'));});
 
 loadSheets();
 </script>
