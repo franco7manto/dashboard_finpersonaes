@@ -575,7 +575,7 @@
       </div>
     </div>
     <div class="card-body" style="padding:0">
-      <div class="table-wrap">
+      <div class="table-wrap" id="tablaTotalesWrap">
         <table>
           <thead><tr>
             <th><span class="th-filter-wrap"><span onclick="sortTable('cat')" style="cursor:pointer;">Categoría <span id="sortIconCat"></span></span><button class="col-filter-btn" id="filterBtnCat" onclick="toggleColFilter(event,'cat')" title="Filtrar">▾</button><div class="col-filter-panel" id="filterPanelCat"></div></span></th>
@@ -1105,9 +1105,25 @@ function toggleColFilter(ev,col){
   const wasOpen=panel.classList.contains('open');
   // cerrar todos los paneles primero
   document.querySelectorAll('.col-filter-panel').forEach(p=>p.classList.remove('open'));
-  if (wasOpen) return;
+  if (wasOpen){ ajustarAlturaFiltro(); return; }
   buildColFilterPanel(col);
   panel.classList.add('open');
+  ajustarAlturaFiltro();
+}
+
+// Garantiza que el contenedor de la tabla tenga espacio para el panel de filtro abierto,
+// así no se recorta ni desaparece cuando la tabla queda con pocas filas.
+function ajustarAlturaFiltro(){
+  const wrap=document.getElementById('tablaTotalesWrap');
+  if (!wrap) return;
+  const panelAbierto=document.querySelector('#tablaTotalesWrap .col-filter-panel.open');
+  if (panelAbierto){
+    // altura real del panel + margen, para que siempre entre completo
+    const necesaria=panelAbierto.offsetHeight+60;
+    wrap.style.minHeight=necesaria+'px';
+  } else {
+    wrap.style.minHeight='';
+  }
 }
 
 function buildColFilterPanel(col){
@@ -1290,12 +1306,12 @@ function renderSubAnalisis(){
   const dets=Object.keys(detMap).sort((a,b)=>detMap[b].total-detMap[a].total);
   const dtb=document.getElementById('anDetTbody');dtb.innerHTML='';
   dets.forEach((d,i)=>{
-    const o=detMap[d];const shade=shades[i%shades.length];
+    const o=detMap[d];
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td style="border-left:3px solid ${shade};">${d}</td>
+    tr.innerHTML=`<td style="border-left:3px solid ${color};">${d}</td>
       <td class="r mono">${fmt$(o.total)}</td>
       <td class="r mono" style="color:var(--muted);">${o.count}</td>
-      <td class="r mono" style="color:${shade};font-weight:500;">${pct(o.total,subTotal)}</td>
+      <td class="r mono" style="color:${color};font-weight:500;">${pct(o.total,subTotal)}</td>
       <td class="r mono" style="color:var(--muted);">${pct(o.total,catTotal)}</td>
       <td class="r mono" style="color:var(--muted);">${pct(o.total,tG)}</td>`;
     dtb.appendChild(tr);
@@ -1443,7 +1459,7 @@ function renderFeProgreso(objetivo){
 
 function toggleDrop(id){document.getElementById(id).classList.toggle('open');}
 document.addEventListener('click',e=>{if(!e.target.closest('.drop-wrap'))document.querySelectorAll('.dropdown').forEach(d=>d.classList.remove('open'));});
-document.addEventListener('click',e=>{if(!e.target.closest('.th-filter-wrap'))document.querySelectorAll('.col-filter-panel').forEach(p=>p.classList.remove('open'));});
+document.addEventListener('click',e=>{if(!e.target.closest('.th-filter-wrap')){document.querySelectorAll('.col-filter-panel').forEach(p=>p.classList.remove('open'));if(typeof ajustarAlturaFiltro==='function')ajustarAlturaFiltro();}});
 
 loadSheets();
 </script>
