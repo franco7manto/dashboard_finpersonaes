@@ -393,6 +393,10 @@
       transition: all 0.15s;
     }
     .add-activo-btn:hover { border-color: var(--teal-dark); color: var(--teal-dark); background: var(--teal-light); }
+    /* activos en modo solo-lectura (vienen de la planilla) */
+    .fe-activo-row-ro { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; margin-bottom: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+    .fe-activo-row-ro .ar-nombre { font-size: 13px; color: var(--ink); }
+    .fe-activo-row-ro .ar-monto { font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 
     .fe-result-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 1.5rem; }
     .fe-result-card {
@@ -665,14 +669,11 @@
         <table class="fe-table">
           <thead><tr>
             <th>Categoría</th><th>Subcategoría</th>
-            <th class="r">Prom. mensual</th><th class="r">Monto ajustado</th>
-            <th class="c">Ponderador</th><th class="r">Impacto FE</th>
+            <th class="r">Prom. mensual</th><th class="r" style="min-width:260px;">Monto a cubrir</th>
           </tr></thead>
           <tbody id="feTbody"></tbody>
           <tfoot><tr class="fe-total-row">
-            <td colspan="3" style="padding:12px 16px;"></td>
-            <td class="r mono" style="padding:12px 16px;" id="feTotalAjustado">—</td>
-            <td style="padding:12px 16px;"></td>
+            <td colspan="3" style="padding:12px 16px;text-align:right;font-weight:600;color:var(--ink-soft);">Total a cubrir (mensual)</td>
             <td class="r mono" style="padding:12px 16px;font-weight:700;color:var(--teal-dark);" id="feTotalFE">—</td>
           </tr></tfoot>
         </table>
@@ -688,20 +689,23 @@
       </div>
       <div class="sub-sep"></div>
       <div class="sub-title">Progreso hacia el fondo</div>
+      <p style="font-size:12.5px;color:var(--muted);margin:-0.5rem 0 1rem;">Los activos se editan en la hoja <strong>Activos</strong> de tu planilla.</p>
       <div class="fe-activos">
         <div class="fe-activo-group">
           <div class="ag-title">Activos seguros (cálculo ácido)</div>
           <div id="activosSeguros"></div>
-          <button class="add-activo-btn" onclick="addActivo('seguros')">+ Agregar activo</button>
         </div>
         <div class="fe-activo-group">
           <div class="ag-title">Activos variables (complementarios)</div>
           <div id="activosVariables"></div>
-          <button class="add-activo-btn" onclick="addActivo('variables')">+ Agregar activo</button>
         </div>
       </div>
       <div class="fe-result-cards" id="feResultCards"></div>
       <div class="progress-wrap" id="feProgressWrap"></div>
+      <div style="display:flex;align-items:center;gap:14px;margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid var(--border);flex-wrap:wrap;">
+        <button id="feSaveBtn" onclick="feGuardar()" disabled style="font-family:var(--font-sans);font-size:13.5px;font-weight:600;padding:9px 20px;border-radius:var(--radius-sm);border:none;background:var(--teal-dark);color:#fff;cursor:pointer;transition:opacity 0.15s;">Guardar cambios</button>
+        <span id="feSaveStatus" style="font-size:13px;color:var(--muted);">Sin cambios</span>
+      </div>
     </div>
   </div>
 </div>
@@ -723,6 +727,7 @@
 <script>
 const SHEET_ID   = '12dHWkxsXqbO6WqJmKMi0zfBsJmKbpegAgqp4TVA3zow';
 const SHEET_NAME = 'DatosDash';
+const FE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwI6_9OP0ZFjogFz1Kg-bubofFnjyG7vpBuEhFAlsJWFNvsk9jj8QkPcwvwj34NbfoKtQ/exec';
 const MESES_LABEL  = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const SHORT_MESES  = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
@@ -760,12 +765,110 @@ async function loadSheets() {
     parseCSV(await resp.text());
     initDashboard();
     document.getElementById('loadingOverlay').style.display='none';
+    cargarFEConfig(); // carga config y activos del fondo de emergencia (no bloquea el dashboard)
   } catch(e) {
     document.getElementById('loadingMsg').style.display='none';
     document.getElementById('errorBox').style.display='block';
     document.getElementById('errorMsg').textContent='No se pudo cargar la planilla. Verificá que esté pública y recargá la página. ('+e.message+')';
   }
 }
+
+// Carga la config guardada (montos a cubrir, meses) y los activos desde el Apps Script
+async function cargarFEConfig(){
+  const status=document.getElementById('feSaveStatus');
+  if (status){status.textContent='Cargando configuración…';status.style.color='var(--muted)';}
+  try {
+    const resp=await fetch(FE_SCRIPT_URL);
+    if (!resp.ok) throw new Error('HTTP '+resp.status);
+    const data=await resp.json();
+    if (data.error) throw new Error(data.error);
+
+    // Activos (solo lectura)
+    activosSeguros=[];activosVariables=[];
+    (data.activos||[]).forEach(a=>{
+      const item={nombre:a.nombre,monto:a.monto};
+      if (a.tipo==='seguro') activosSeguros.push(item);
+      else if (a.tipo==='variable') activosVariables.push(item);
+    });
+
+    // Config: montos a cubrir guardados + meses
+    (data.config||[]).forEach(c=>{
+      if (c.categoria==='__config__'){
+        if (c.subcategoria==='meses' && c.montoAjustado>0){
+          feState.meses=c.montoAjustado;
+          document.querySelectorAll('#mesesToggle button').forEach(b=>{
+            b.classList.toggle('active', b.textContent.trim().startsWith(String(c.montoAjustado)));
+          });
+        }
+      } else {
+        const key=feKey(c.categoria,c.subcategoria);
+        feState.ajustados[key]=c.montoAjustado;
+      }
+    });
+
+    feConfigLoaded=true;
+    renderFE(); // re-render con los valores cargados
+    feDirty=false;
+    const btn=document.getElementById('feSaveBtn');
+    if (btn) btn.disabled=true;
+    if (status){
+      const hayConfig=(data.config||[]).length>0;
+      status.textContent=hayConfig?'Configuración cargada':'Sin configuración guardada aún';
+      status.style.color='var(--muted)';
+    }
+  } catch(e){
+    if (status){status.textContent='No se pudo cargar la configuración guardada';status.style.color='var(--coral,#c0392b)';}
+    // Igual renderizamos los activos vacíos / lo que haya
+    renderFE();
+  }
+}
+
+// Guarda la config actual en Sheets vía el Apps Script
+async function feGuardar(){
+  const btn=document.getElementById('feSaveBtn');
+  const status=document.getElementById('feSaveStatus');
+  if (btn) btn.disabled=true;
+  if (status){status.textContent='Guardando…';status.style.color='var(--muted)';}
+
+  // Armar la config: una fila por subcategoría existente + fila __config__ para meses
+  const seen={};
+  const config=[];
+  DATA.forEach(r=>{
+    const key=feKey(r.categoria,r.subcategoria);
+    if (seen[key]) return;
+    seen[key]=true;
+    config.push({
+      categoria:r.categoria,
+      subcategoria:r.subcategoria,
+      montoAjustado:feState.ajustados[key]||0,
+      ponderador:1
+    });
+  });
+  // Fila de parámetros generales
+  config.push({categoria:'__config__',subcategoria:'meses',montoAjustado:feState.meses,ponderador:1});
+
+  try {
+    // text/plain evita el preflight CORS que bloquearía la escritura
+    const resp=await fetch(FE_SCRIPT_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({config})
+    });
+    const data=await resp.json();
+    if (!data.ok) throw new Error(data.error||'respuesta inesperada');
+    feDirty=false;
+    if (status){
+      const ahora=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+      status.textContent='Guardado '+ahora;
+      status.style.color='var(--teal-dark)';
+    }
+    if (btn) btn.disabled=true;
+  } catch(e){
+    if (status){status.textContent='Error al guardar: '+e.message;status.style.color='var(--coral,#c0392b)';}
+    if (btn) btn.disabled=false;
+  }
+}
+
 
 function parseCSV(csv) {
   const lines=csv.trim().split('\n');
@@ -1199,8 +1302,22 @@ function renderSubAnalisis(){
 }
 
 const feState={meses:6,ajustados:{},ponderadores:{}};
-let activosSeguros=[{nombre:'',monto:0}];
-let activosVariables=[{nombre:'',monto:0}];
+let activosSeguros=[];
+let activosVariables=[];
+let feDirty=false;        // hay cambios sin guardar
+let feConfigLoaded=false; // ya se cargó la config desde Sheets
+
+// Marca que hay cambios sin guardar y actualiza el botón
+function feMarkDirty(){
+  feDirty=true;
+  const btn=document.getElementById('feSaveBtn');
+  const status=document.getElementById('feSaveStatus');
+  if (btn) btn.disabled=false;
+  if (status){status.textContent='Cambios sin guardar';status.style.color='var(--amber-text,#9a6a00)';}
+}
+
+// Clave estable para identificar una subcategoría (no depende del orden)
+function feKey(cat,sub){return cat+'|||'+sub;}
 
 function renderFE(){
   const subMap={};
@@ -1208,58 +1325,93 @@ function renderFE(){
   const mes=[...new Set(DATA.map(r=>r.year+'-'+r.month))].length||1;
   const rows=Object.values(subMap).sort((a,b)=>a.cat.localeCompare(b.cat)||b.total-a.total);
   const tbody=document.getElementById('feTbody');tbody.innerHTML='';
-  let lastCat=null,totalAj=0,totalFE=0;
+  let lastCat=null,totalCubrir=0;
   rows.forEach((r,i)=>{
     const isFirst=r.cat!==lastCat;
     const acc=CAT_COLOR[r.cat]||'#888';
     const prom=Math.round(r.total/mes);
-    if (feState.ajustados[i]===undefined) feState.ajustados[i]=prom;
-    if (feState.ponderadores[i]===undefined) feState.ponderadores[i]=1.0;
-    const aj=feState.ajustados[i];const pond=feState.ponderadores[i];
-    const impacto=Math.round(aj*pond);
-    totalAj+=aj;totalFE+=impacto;
+    const key=feKey(r.cat,r.sub);
+    // Por defecto, el monto a cubrir arranca igual al promedio
+    if (feState.ajustados[key]===undefined) feState.ajustados[key]=prom;
+    const aj=feState.ajustados[key];
+    totalCubrir+=aj;
+    // El slider representa el % del promedio; capeado visualmente a 100%
+    const sliderPct=prom>0?Math.min(Math.round(aj/prom*100),100):0;
+    const keyJS=key.replace(/'/g,"\\'");
     const tr=document.createElement('tr');
     tr.innerHTML=`
       <td style="border-left:3px solid ${isFirst?acc:'transparent'};font-weight:${isFirst?'600':'400'};color:${isFirst?'var(--ink)':'transparent'};user-select:none;">${r.cat}</td>
       <td>${r.sub}</td>
       <td class="r mono" style="color:var(--muted);">${fmt$(prom)}</td>
       <td class="r" style="padding:6px 16px;">
-        <input type="number" value="${aj}" min="0" step="1000" onchange="feState.ajustados[${i}]=+this.value;renderFE()"/>
-      </td>
-      <td class="c" style="padding:6px 16px;">
-        <div style="display:flex;align-items:center;gap:8px;justify-content:center;">
-          <input type="range" min="0" max="1" step="0.05" value="${pond}" oninput="this.nextElementSibling.textContent=Math.round(this.value*100)+'%';feState.ponderadores[${i}]=+this.value;renderFE()" style="width:80px;accent-color:${acc}"/>
-          <span style="font-size:12px;color:var(--muted);width:36px;text-align:left;">${Math.round(pond*100)}%</span>
+        <div style="display:flex;align-items:center;gap:10px;justify-content:flex-end;">
+          <input type="range" min="0" max="100" step="1" value="${sliderPct}" id="feSl_${i}"
+            oninput="feOnSliderInput('${keyJS}',${prom},${i},this.value)" style="width:90px;accent-color:${acc};cursor:pointer;flex-shrink:0;"/>
+          <span style="font-size:12px;color:var(--muted);width:32px;text-align:left;flex-shrink:0;" id="feSlPct_${i}">${sliderPct}%</span>
+          <input type="number" value="${aj}" min="0" step="1000" id="feAj_${i}"
+            oninput="feOnMontoInput('${keyJS}',${prom},${i},this.value)" style="width:120px;"/>
         </div>
-      </td>
-      <td class="r mono" style="color:${acc};font-weight:600;">${fmt$(impacto)}</td>`;
+      </td>`;
     tbody.appendChild(tr);lastCat=r.cat;
   });
-  document.getElementById('feTotalAjustado').textContent=fmt$(totalAj);
-  document.getElementById('feTotalFE').textContent=fmt$(totalFE);
-  document.getElementById('feObjetivo').textContent=fmt$(totalFE*feState.meses);
-  renderFeProgreso(totalFE*feState.meses);
+  document.getElementById('feTotalFE').textContent=fmt$(totalCubrir);
+  document.getElementById('feObjetivo').textContent=fmt$(totalCubrir*feState.meses);
+  renderFeProgreso(totalCubrir*feState.meses);
+}
+
+// El usuario escribe un monto: actualiza el slider (capeado a 100%), sin re-render completo
+function feOnMontoInput(key,prom,i,val){
+  const aj=+val||0;
+  feState.ajustados[key]=aj;
+  const sliderPct=prom>0?Math.min(Math.round(aj/prom*100),100):0;
+  const sl=document.getElementById('feSl_'+i);
+  const slPct=document.getElementById('feSlPct_'+i);
+  if (sl) sl.value=sliderPct;
+  if (slPct) slPct.textContent=sliderPct+'%';
+  feRecalcTotales();
+  feMarkDirty();
+}
+
+// El usuario mueve el slider: actualiza el monto (% del promedio), sin re-render completo
+function feOnSliderInput(key,prom,i,val){
+  const pctNum=+val||0;
+  const aj=Math.round(prom*pctNum/100);
+  feState.ajustados[key]=aj;
+  const slPct=document.getElementById('feSlPct_'+i);
+  const aj_input=document.getElementById('feAj_'+i);
+  if (slPct) slPct.textContent=pctNum+'%';
+  if (aj_input) aj_input.value=aj;
+  feRecalcTotales();
+  feMarkDirty();
+}
+
+// Recalcula totales sin reconstruir la tabla (mantiene el arrastre fluido)
+function feRecalcTotales(){
+  let totalCubrir=0;
+  const seen={};
+  DATA.forEach(r=>{const k=feKey(r.categoria,r.subcategoria);if(!seen[k]){seen[k]=true;totalCubrir+=(feState.ajustados[k]||0);}});
+  document.getElementById('feTotalFE').textContent=fmt$(totalCubrir);
+  document.getElementById('feObjetivo').textContent=fmt$(totalCubrir*feState.meses);
+  renderFeProgreso(totalCubrir*feState.meses);
 }
 
 function setMeses(btn,m){
   document.querySelectorAll('#mesesToggle button').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');feState.meses=m;renderFE();
+  btn.classList.add('active');feState.meses=m;renderFE();feMarkDirty();
 }
 
 function renderActivoGroup(list,containerId,tipo){
   const c=document.getElementById(containerId);c.innerHTML='';
-  list.forEach((a,i)=>{
-    const row=document.createElement('div');row.className='fe-activo-row';
-    row.innerHTML=`<input type="text" value="${a.nombre}" placeholder="Nombre del activo" onchange="getActivos('${tipo}')[${i}].nombre=this.value"/>
-      <input type="number" value="${a.monto}" min="0" step="10000" placeholder="Monto" onchange="getActivos('${tipo}')[${i}].monto=+this.value;renderFeProgreso()"/>
-      <button onclick="removeActivo('${tipo}',${i})">×</button>`;
+  if (!list.length){
+    c.innerHTML='<div style="font-size:12.5px;color:var(--muted);padding:6px 0;">Sin activos cargados en la planilla.</div>';
+    return;
+  }
+  list.forEach(a=>{
+    const row=document.createElement('div');row.className='fe-activo-row-ro';
+    row.innerHTML=`<span class="ar-nombre">${a.nombre||'(sin nombre)'}</span><span class="ar-monto mono">${fmt$(a.monto)}</span>`;
     c.appendChild(row);
   });
 }
-
-function getActivos(tipo){return tipo==='seguros'?activosSeguros:activosVariables;}
-function addActivo(tipo){getActivos(tipo).push({nombre:'',monto:0});renderActivoGroup(getActivos(tipo),tipo==='seguros'?'activosSeguros':'activosVariables',tipo);renderFeProgreso();}
-function removeActivo(tipo,i){getActivos(tipo).splice(i,1);renderActivoGroup(getActivos(tipo),tipo==='seguros'?'activosSeguros':'activosVariables',tipo);renderFeProgreso();}
 
 function renderFeProgreso(objetivo){
   if (objetivo===undefined){const raw=document.getElementById('feTotalFE').textContent.replace(/[^0-9]/g,'');objetivo=parseInt(raw||'0')*feState.meses;}
