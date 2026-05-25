@@ -712,17 +712,114 @@
 
 <!-- TAB 5: DEUDA -->
 <div class="tab-content" id="t-deuda">
+  <!-- 5 TARJETAS RESUMEN -->
+  <div class="metrics" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));">
+    <div class="metric">
+      <div class="metric-label">Deuda total</div>
+      <div class="metric-value" id="dTotal" style="color:var(--coral)">—</div>
+      <div class="metric-sub" id="dTotalSub">—</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Deuda padres (indexada)</div>
+      <div class="metric-value" id="dPadres" style="color:var(--teal-dark)">—</div>
+      <div class="metric-sub" id="dPadresSub">—</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Deuda Santander</div>
+      <div class="metric-value" id="dSantander" style="color:var(--purple)">—</div>
+      <div class="metric-sub" id="dSantanderSub">—</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Meses hasta libre de deuda</div>
+      <div class="metric-value" id="dMeses">—</div>
+      <div class="metric-sub" id="dMesesSub">—</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Próximo pago</div>
+      <div class="metric-value" id="dProximo" style="font-size:20px;">—</div>
+      <div class="metric-sub" id="dProximoSub">—</div>
+    </div>
+  </div>
+
+  <!-- WIDGET SANTANDER -->
   <div class="card">
-    <div class="card-head"><span class="card-head-title">Control de deuda</span></div>
+    <div class="card-head">
+      <span class="card-head-title">Préstamo Santander — flujo de pagos</span>
+      <span style="font-size:13px;color:var(--muted)">Saldo de capital: <strong style="color:var(--ink);font-variant-numeric:tabular-nums;" id="santSaldo">—</strong></span>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Cuota</th><th>Fecha</th>
+            <th class="r">Cuota total</th><th class="r">Saldo restante</th>
+          </tr></thead>
+          <tbody id="santTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- WIDGET PADRES -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-head-title">Préstamo de familia — evolución y proyección</span>
+    </div>
     <div class="card-body">
-      <div class="empty-tab">
-        <p>Esta sección está pendiente de configuración.<br>Compartí los datos de tus deudas y lo armamos juntos.</p>
+      <!-- Gráfico -->
+      <div class="chart-wrap" style="height:300px"><canvas id="cDeudaPadres"></canvas></div>
+      <div class="legend mb" id="legDeudaPadres"></div>
+
+      <div class="sub-sep"></div>
+
+      <!-- Simulador -->
+      <div class="sub-title">Simulador de pago</div>
+      <p style="font-size:12.5px;color:var(--muted);margin:-0.5rem 0 1rem;">Definí cuánto querés pagar por mes o en cuántos meses querés saldarla. Calculá uno y se completa el otro. La proyección asume inflación 0 hacia adelante.</p>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-end;margin-bottom:1.5rem;">
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Monto mensual</label>
+          <input type="number" id="simMonto" min="0" step="10000" placeholder="Ej: 300000"
+            oninput="simularDesdeMonto()" style="width:160px;font-family:var(--font-sans);font-size:14px;padding:8px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);background:var(--bg);color:var(--ink);outline:none;text-align:right;font-variant-numeric:tabular-nums;"/>
+        </div>
+        <div style="font-size:13px;color:var(--muted);padding-bottom:10px;">o</div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Cantidad de meses</label>
+          <input type="number" id="simMeses" min="1" step="1" placeholder="Ej: 12"
+            oninput="simularDesdeMeses()" style="width:160px;font-family:var(--font-sans);font-size:14px;padding:8px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);background:var(--bg);color:var(--ink);outline:none;text-align:right;font-variant-numeric:tabular-nums;"/>
+        </div>
+      </div>
+      <div class="stats-grid" id="simResultado"></div>
+
+      <div class="sub-sep"></div>
+
+      <!-- Registro de pago -->
+      <div class="sub-title">Registrar un pago</div>
+      <p style="font-size:12.5px;color:var(--muted);margin:-0.5rem 0 1rem;">Cargá los pagos que vas haciendo. Se guardan en la hoja <strong>Pagos_Padres</strong> y reducen la deuda.</p>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;">
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Fecha</label>
+          <input type="date" id="pagoFecha" style="font-family:var(--font-sans);font-size:14px;padding:8px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);background:var(--bg);color:var(--ink);outline:none;"/>
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Monto</label>
+          <input type="number" id="pagoMonto" min="0" step="10000" placeholder="Monto del pago"
+            style="width:160px;font-family:var(--font-sans);font-size:14px;padding:8px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);background:var(--bg);color:var(--ink);outline:none;text-align:right;font-variant-numeric:tabular-nums;"/>
+        </div>
+        <button id="pagoBtn" onclick="registrarPago()" style="font-family:var(--font-sans);font-size:13.5px;font-weight:600;padding:9px 20px;border-radius:var(--radius-sm);border:none;background:var(--teal-dark);color:#fff;cursor:pointer;">Registrar pago</button>
+        <span id="pagoStatus" style="font-size:13px;color:var(--muted);padding-bottom:9px;"></span>
+      </div>
+
+      <!-- Historial de pagos -->
+      <div class="table-wrap" style="margin-top:1.5rem;">
+        <table><thead><tr>
+          <th>Fecha del pago</th><th class="r">Monto</th>
+        </tr></thead><tbody id="pagosTbody"></tbody></table>
       </div>
     </div>
   </div>
 </div>
 
-<div class="footer">Dashboard de gastos personales · v6 · datos en vivo desde Google Sheets</div>
+<div class="footer">Dashboard de gastos personales · v7 · datos en vivo desde Google Sheets</div>
 
 <script>
 const SHEET_ID   = '12dHWkxsXqbO6WqJmKMi0zfBsJmKbpegAgqp4TVA3zow';
@@ -756,6 +853,295 @@ function switchTab(btn,id) {
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById(id).classList.add('active');
+}
+
+/* ============================ CONTROL DE DEUDA ============================ */
+
+const MESES_CORTO=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+// Formatea "MM/YYYY" -> "MMM YYYY" (ej "04/2025" -> "abr 2025")
+function fmtMesAnio(s){
+  if (!s) return '';
+  const m=String(s).match(/^(\d{1,2})\/(\d{4})$/);
+  if (!m) return String(s);
+  return MESES_CORTO[parseInt(m[1])-1]+' '+m[2];
+}
+
+// Formatea una fecha "DD/MM/YYYY" -> "DD MMM YYYY"
+function fmtFechaCorta(s){
+  if (!s) return '';
+  const m=String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return String(s);
+  return m[1]+' '+MESES_CORTO[parseInt(m[2])-1]+' '+m[3];
+}
+
+// Total de la deuda de padres = suma de "valorActual" de la planilla
+function totalDeudaPadres(){
+  return deudaPadresData.reduce((s,r)=>s+(r.valorActual||0),0);
+}
+
+// Total ya pagado a la deuda de padres
+function totalPagadoPadres(){
+  return pagosPadresData.reduce((s,p)=>s+(p.monto||0),0);
+}
+
+// Saldo actual de padres = total indexado menos lo ya pagado
+function saldoPadres(){
+  return Math.max(totalDeudaPadres()-totalPagadoPadres(),0);
+}
+
+// Reconstruye el cronograma restante de Santander a partir de los datos base.
+// Devuelve un array de cuotas: { n, fecha, cuotaTotal, saldoRestante }
+function cronogramaSantander(){
+  const d=deudaSantanderData;
+  if (!d || !d.saldoCapital) return [];
+  let saldo=d.saldoCapital;
+  const cuotaPura=d.cuotaPura||0;
+  const tasa=d.tasaMensual||0;
+  const n=d.cuotasRestantes||0;
+  const iva=0.21;
+  // Número de la primera cuota restante: total 36, quedan n -> primera = 37-n
+  const primeraCuota=37-n;
+  // Fecha de la próxima cuota
+  let fechaBase=parseFechaDDMMYYYY(d.proximaCuota);
+  const cuotas=[];
+  for (let i=0;i<n;i++){
+    const interes=saldo*tasa;
+    const ivaInt=interes*iva;
+    const amort=cuotaPura-interes;
+    const cuotaTotal=amort+interes+ivaInt;
+    const saldoNuevo=Math.max(saldo-amort,0);
+    let fechaTexto='';
+    if (fechaBase){
+      const f=new Date(fechaBase.getFullYear(),fechaBase.getMonth()+i,1);
+      fechaTexto=MESES_CORTO[f.getMonth()]+' '+f.getFullYear();
+    }
+    cuotas.push({n:primeraCuota+i,fecha:fechaTexto,cuotaTotal:cuotaTotal,saldoRestante:saldoNuevo});
+    saldo=saldoNuevo;
+  }
+  return cuotas;
+}
+
+function parseFechaDDMMYYYY(s){
+  if (!s) return null;
+  const m=String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));
+}
+
+// Total que falta pagar de Santander = suma de las cuotas restantes
+function totalSantander(){
+  return cronogramaSantander().reduce((s,c)=>s+c.cuotaTotal,0);
+}
+
+// Render principal de la tab de deuda
+function renderDeuda(){
+  const sPadres=saldoPadres();
+  const sSant=totalSantander();
+  const total=sPadres+sSant;
+
+  // --- Tarjetas ---
+  document.getElementById('dTotal').textContent=fmt$(total);
+  document.getElementById('dTotalSub').textContent='padres + Santander';
+  document.getElementById('dPadres').textContent=fmt$(sPadres);
+  const pagado=totalPagadoPadres();
+  document.getElementById('dPadresSub').textContent= pagado>0 ? ('ya pagaste '+fmt$(pagado)) : 'sin pagos aún';
+  document.getElementById('dSantander').textContent=fmt$(sSant);
+  const cuotasSant=cronogramaSantander();
+  document.getElementById('dSantanderSub').textContent= cuotasSant.length+' cuotas restantes';
+
+  // Meses hasta libre de deuda: el mayor entre cuotas de Santander y meses proyectados de padres (si hay simulación)
+  const mesesSant=cuotasSant.length;
+  let mesesPadres=0;
+  const montoSim=parseFloat(document.getElementById('simMonto').value)||0;
+  if (montoSim>0 && sPadres>0) mesesPadres=Math.ceil(sPadres/montoSim);
+  const mesesTotal=Math.max(mesesSant,mesesPadres);
+  document.getElementById('dMeses').textContent= mesesTotal>0 ? mesesTotal : '—';
+  document.getElementById('dMesesSub').textContent= mesesPadres>0 ? 'según simulación de padres' : 'definí el simulador de padres';
+
+  // Próximo pago: la próxima cuota de Santander
+  if (cuotasSant.length){
+    document.getElementById('dProximo').textContent=fmt$(cuotasSant[0].cuotaTotal);
+    document.getElementById('dProximoSub').textContent='Santander · '+cuotasSant[0].fecha;
+  } else {
+    document.getElementById('dProximo').textContent='—';
+    document.getElementById('dProximoSub').textContent='sin cuotas pendientes';
+  }
+
+  // --- Widget Santander ---
+  document.getElementById('santSaldo').textContent=fmt$(deudaSantanderData.saldoCapital||0);
+  const stb=document.getElementById('santTbody');stb.innerHTML='';
+  cuotasSant.forEach(c=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${c.n}/36</td><td>${c.fecha}</td>
+      <td class="r mono">${fmt$(c.cuotaTotal)}</td>
+      <td class="r mono" style="color:var(--muted);">${fmt$(c.saldoRestante)}</td>`;
+    stb.appendChild(tr);
+  });
+
+  // --- Widget Padres: historial de pagos ---
+  const ptb=document.getElementById('pagosTbody');ptb.innerHTML='';
+  if (!pagosPadresData.length){
+    ptb.innerHTML='<tr><td colspan="2" style="color:var(--muted);text-align:center;padding:1.5rem;">Todavía no registraste pagos.</td></tr>';
+  } else {
+    pagosPadresData.forEach(p=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${fmtFechaCorta(p.fecha)}</td><td class="r mono">${fmt$(p.monto)}</td>`;
+      ptb.appendChild(tr);
+    });
+  }
+
+  renderGraficoPadres();
+}
+
+// Gráfico de evolución de la deuda de padres: línea real (histórico) + proyección punteada
+function renderGraficoPadres(){
+  const canvas=document.getElementById('cDeudaPadres');
+  if (!canvas) return;
+
+  // Línea real: el valor actual indexado mes a mes (acumulado de la deuda que se fue tomando)
+  // Mostramos el saldo de deuda acumulado a lo largo de los meses de la planilla.
+  const labels=deudaPadresData.map(r=>fmtMesAnio(r.mes));
+  let acum=0;
+  const real=deudaPadresData.map(r=>{acum+=r.valorActual||0;return Math.round(acum);});
+
+  // Punto de partida de la proyección: saldo actual (total indexado menos pagos)
+  const saldoHoy=saldoPadres();
+
+  // Proyección: línea punteada que baja según el monto mensual del simulador (inflación 0)
+  const montoSim=parseFloat(document.getElementById('simMonto').value)||0;
+  let proyLabels=[],proyData=[];
+  if (montoSim>0 && saldoHoy>0){
+    let s=saldoHoy;let i=0;
+    // arranca desde "hoy" (último punto de la serie real)
+    proyData.push(Math.round(saldoHoy));
+    proyLabels.push('Hoy');
+    while (s>0 && i<240){
+      s=Math.max(s-montoSim,0);i++;
+      proyData.push(Math.round(s));
+      proyLabels.push('+'+i+'m');
+    }
+  }
+
+  // Para superponer las dos series en un mismo eje, construimos labels combinados
+  const allLabels=labels.concat(proyLabels);
+  // La serie real ocupa las primeras posiciones; la proyección, las siguientes
+  const realPadded=real.concat(new Array(proyLabels.length).fill(null));
+  const proyPadded=new Array(labels.length).fill(null).concat(proyData);
+
+  const datasets=[
+    {label:'Deuda real (indexada)',data:realPadded,borderColor:'#006B5F',backgroundColor:'transparent',tension:0.3,pointRadius:0,pointHoverRadius:5,borderWidth:2.5,spanGaps:false}
+  ];
+  if (proyData.length){
+    datasets.push({label:'Proyección de pago',data:proyPadded,borderColor:'#6B4F9E',backgroundColor:'transparent',tension:0,pointRadius:0,pointHoverRadius:5,borderWidth:2,borderDash:[5,4],spanGaps:false});
+  }
+
+  if (cDeudaPadresChart) cDeudaPadresChart.destroy();
+  cDeudaPadresChart=new Chart(canvas,{type:'line',data:{labels:allLabels,datasets:datasets},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1a1a',titleColor:'#fff',bodyColor:'#fff',padding:10,cornerRadius:6,callbacks:{label:ctx=>ctx.parsed.y!=null?' '+ctx.dataset.label+': '+fmt$(ctx.parsed.y):''}}},
+      scales:{y:{beginAtZero:true,ticks:{callback:v=>{const m=v/1000000;return m===Math.round(m)&&Math.abs(m)>=1?'$'+m+'M':'$'+(v/1000).toFixed(0)+'K';},font:{size:11,family:'Source Sans 3'},color:tickColor()},grid:{color:gridColor(),drawTicks:false},border:{display:false}},
+        x:{ticks:{font:{size:10,family:'Source Sans 3'},color:tickColor(),maxRotation:60,minRotation:0},grid:{display:false},border:{display:false}}}}});
+
+  const leg=document.getElementById('legDeudaPadres');
+  leg.innerHTML=`<div class="legend-item"><span class="legend-dot" style="background:#006B5F"></span>Deuda real (indexada)</div>`+
+    (proyData.length?`<div class="legend-item"><span class="legend-dot" style="background:#6B4F9E"></span>Proyección de pago (inflación 0)</div>`:'');
+}
+
+// Simulador: desde el monto mensual, calcular meses
+function simularDesdeMonto(){
+  const monto=parseFloat(document.getElementById('simMonto').value)||0;
+  const saldo=saldoPadres();
+  const inputMeses=document.getElementById('simMeses');
+  if (monto>0 && saldo>0){
+    const meses=Math.ceil(saldo/monto);
+    inputMeses.value=meses;
+    mostrarResultadoSim(monto,meses,saldo);
+  } else {
+    inputMeses.value='';
+    document.getElementById('simResultado').innerHTML='';
+  }
+  renderGraficoPadres();
+  renderTarjetasMeses();
+}
+
+// Simulador: desde los meses, calcular monto mensual
+function simularDesdeMeses(){
+  const meses=parseInt(document.getElementById('simMeses').value)||0;
+  const saldo=saldoPadres();
+  const inputMonto=document.getElementById('simMonto');
+  if (meses>0 && saldo>0){
+    const monto=Math.ceil(saldo/meses);
+    inputMonto.value=monto;
+    mostrarResultadoSim(monto,meses,saldo);
+  } else {
+    inputMonto.value='';
+    document.getElementById('simResultado').innerHTML='';
+  }
+  renderGraficoPadres();
+  renderTarjetasMeses();
+}
+
+function mostrarResultadoSim(monto,meses,saldo){
+  // Fecha estimada de fin
+  const hoy=new Date();
+  const fin=new Date(hoy.getFullYear(),hoy.getMonth()+meses,1);
+  const finTexto=MESES_CORTO[fin.getMonth()]+' '+fin.getFullYear();
+  document.getElementById('simResultado').innerHTML=`
+    <div class="stat-card"><div class="stat-label">Saldo actual</div><div class="sval">${fmt$(saldo)}</div></div>
+    <div class="stat-card"><div class="stat-label">Pago mensual</div><div class="sval">${fmt$(monto)}</div></div>
+    <div class="stat-card"><div class="stat-label">Meses para saldar</div><div class="sval">${meses}</div></div>
+    <div class="stat-card"><div class="stat-label">Libre de deuda en</div><div class="sval" style="font-size:18px;">${finTexto}</div></div>`;
+}
+
+// Actualiza solo la tarjeta de "meses hasta libre de deuda" cuando cambia la simulación
+function renderTarjetasMeses(){
+  const cuotasSant=cronogramaSantander().length;
+  const montoSim=parseFloat(document.getElementById('simMonto').value)||0;
+  const sPadres=saldoPadres();
+  let mesesPadres=0;
+  if (montoSim>0 && sPadres>0) mesesPadres=Math.ceil(sPadres/montoSim);
+  const mesesTotal=Math.max(cuotasSant,mesesPadres);
+  document.getElementById('dMeses').textContent= mesesTotal>0 ? mesesTotal : '—';
+  document.getElementById('dMesesSub').textContent= mesesPadres>0 ? 'según simulación de padres' : 'definí el simulador de padres';
+}
+
+// Registrar un pago: lo manda al Apps Script y actualiza la vista
+async function registrarPago(){
+  const fechaInput=document.getElementById('pagoFecha').value; // formato YYYY-MM-DD
+  const monto=parseFloat(document.getElementById('pagoMonto').value)||0;
+  const status=document.getElementById('pagoStatus');
+  const btn=document.getElementById('pagoBtn');
+
+  if (!fechaInput || !monto){
+    status.textContent='Completá fecha y monto';status.style.color='var(--coral,#c0392b)';
+    return;
+  }
+  // Convertir YYYY-MM-DD -> DD/MM/YYYY
+  const partes=fechaInput.split('-');
+  const fecha=partes[2]+'/'+partes[1]+'/'+partes[0];
+
+  btn.disabled=true;
+  status.textContent='Guardando…';status.style.color='var(--muted)';
+  try {
+    const resp=await fetch(FE_SCRIPT_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({accion:'agregarPago',pago:{fecha:fecha,monto:monto}})
+    });
+    const data=await resp.json();
+    if (!data.ok) throw new Error(data.error||'respuesta inesperada');
+    // Agregar el pago localmente para no tener que recargar todo
+    pagosPadresData.push({fecha:fecha,monto:monto});
+    document.getElementById('pagoMonto').value='';
+    document.getElementById('pagoFecha').value='';
+    status.textContent='Pago registrado';status.style.color='var(--teal-dark)';
+    renderDeuda();
+  } catch(e){
+    status.textContent='Error al guardar: '+e.message;status.style.color='var(--coral,#c0392b)';
+  } finally {
+    btn.disabled=false;
+  }
 }
 
 async function loadSheets() {
@@ -817,6 +1203,12 @@ async function cargarFEConfig(){
       status.textContent=hayConfig?'Configuración cargada':'Sin configuración guardada aún';
       status.style.color='var(--muted)';
     }
+
+    // DEUDAS: guardar datos crudos y renderizar la tab de control de deuda
+    deudaPadresData=data.deudaPadres||[];
+    deudaSantanderData=data.deudaSantander||{};
+    pagosPadresData=data.pagosPadres||[];
+    renderDeuda();
   } catch(e){
     if (status){status.textContent='No se pudo cargar la configuración guardada';status.style.color='var(--coral,#c0392b)';}
     // Igual renderizamos los activos vacíos / lo que haya
@@ -1323,6 +1715,12 @@ let activosSeguros=[];
 let activosVariables=[];
 let feDirty=false;        // hay cambios sin guardar
 let feConfigLoaded=false; // ya se cargó la config desde Sheets
+
+// DEUDAS: datos crudos traídos del Apps Script
+let deudaPadresData=[];
+let deudaSantanderData={};
+let pagosPadresData=[];
+let cDeudaPadresChart=null;
 
 // Marca que hay cambios sin guardar y actualiza el botón
 function feMarkDirty(){
