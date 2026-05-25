@@ -819,7 +819,7 @@
   </div>
 </div>
 
-<div class="footer">Dashboard de gastos personales · v7 · datos en vivo desde Google Sheets</div>
+<div class="footer">Dashboard de gastos personales · v8 · datos en vivo desde Google Sheets</div>
 
 <script>
 const SHEET_ID   = '12dHWkxsXqbO6WqJmKMi0zfBsJmKbpegAgqp4TVA3zow';
@@ -859,20 +859,29 @@ function switchTab(btn,id) {
 
 const MESES_CORTO=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 
-// Formatea "MM/YYYY" -> "MMM YYYY" (ej "04/2025" -> "abr 2025")
+// Formatea fechas de mes a "MMM YYYY" (ej "abr 2025").
+// Acepta tanto "MM/YYYY" como el formato largo de JavaScript ("Tue Apr 01 2025...").
 function fmtMesAnio(s){
   if (!s) return '';
+  // Caso 1: formato corto "MM/YYYY"
   const m=String(s).match(/^(\d{1,2})\/(\d{4})$/);
-  if (!m) return String(s);
-  return MESES_CORTO[parseInt(m[1])-1]+' '+m[2];
+  if (m) return MESES_CORTO[parseInt(m[1])-1]+' '+m[2];
+  // Caso 2: cualquier otra cosa que JS pueda parsear como fecha (formato largo)
+  const d=new Date(s);
+  if (!isNaN(d.getTime())) return MESES_CORTO[d.getMonth()]+' '+d.getFullYear();
+  // Si no se pudo, devolver tal cual
+  return String(s);
 }
 
-// Formatea una fecha "DD/MM/YYYY" -> "DD MMM YYYY"
+// Formatea una fecha de pago a "DD MMM YYYY".
+// Acepta "DD/MM/YYYY" o el formato largo de JavaScript.
 function fmtFechaCorta(s){
   if (!s) return '';
   const m=String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!m) return String(s);
-  return m[1]+' '+MESES_CORTO[parseInt(m[2])-1]+' '+m[3];
+  if (m) return m[1]+' '+MESES_CORTO[parseInt(m[2])-1]+' '+m[3];
+  const d=new Date(s);
+  if (!isNaN(d.getTime())) return d.getDate()+' '+MESES_CORTO[d.getMonth()]+' '+d.getFullYear();
+  return String(s);
 }
 
 // Total de la deuda de padres = suma de "valorActual" de la planilla
@@ -925,8 +934,10 @@ function cronogramaSantander(){
 function parseFechaDDMMYYYY(s){
   if (!s) return null;
   const m=String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!m) return null;
-  return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));
+  if (m) return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));
+  // Fallback: formato largo de JavaScript u otro que Date pueda parsear
+  const d=new Date(s);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 // Total que falta pagar de Santander = suma de las cuotas restantes
