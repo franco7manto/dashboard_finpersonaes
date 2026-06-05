@@ -496,6 +496,7 @@
   <button class="tab-btn" onclick="switchTab(this,'t-analisis')">Análisis por categoría</button>
   <button class="tab-btn" onclick="switchTab(this,'t-fe')">Fondo de emergencia</button>
   <button class="tab-btn" onclick="switchTab(this,'t-deuda')">Control de deuda</button>
+  <button class="tab-btn" onclick="switchTab(this,'t-ingresos')">Ingresos</button>
 </div>
 
 <!-- TAB 1: PANEL GENERAL -->
@@ -612,7 +613,10 @@
         </tr></thead><tbody id="anSubTbody"></tbody></table>
       </div>
       <div class="sub-sep"></div>
-      <div class="sub-title" id="anEvolTitle">Evolución mensual</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:1rem;">
+        <div class="sub-title" id="anEvolTitle" style="margin:0">Evolución mensual</div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft);cursor:pointer;"><input type="checkbox" id="toggleInflacionEvol" onchange="renderAnalisis()" style="accent-color:var(--teal-dark)"> Inflación acumulada</label>
+      </div>
       <div class="chart-wrap" style="height:280px"><canvas id="cEvol"></canvas></div>
       <div class="legend mb" id="legEvol"></div>
       <div class="sub-sep"></div>
@@ -821,7 +825,79 @@
   </div>
 </div>
 
-<div class="footer">Dashboard de gastos personales · v9 · datos en vivo desde Google Sheets</div>
+<!-- TAB 6: INGRESOS -->
+<div class="tab-content" id="t-ingresos">
+  <div class="metrics" id="ingMetrics">
+    <div class="metric">
+      <div class="metric-label">Total ingresos</div>
+      <div class="metric-value" id="ingTotal" style="color:var(--teal-mid)">—</div>
+      <div class="metric-sub" id="ingTotalSub">—</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Promedio mensual</div>
+      <div class="metric-value" id="ingProm">—</div>
+      <div class="metric-sub" id="ingPromSub">—</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Meses con ingreso</div>
+      <div class="metric-value" id="ingMeses">—</div>
+      <div class="metric-sub" id="ingMesesSub">—</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Tasa de ahorro</div>
+      <div class="metric-value" id="ingTasaAhorro">—</div>
+      <div class="metric-sub" id="ingTasaAhorroSub">—</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-head-title">Evolución de ingresos</span>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft);cursor:pointer;"><input type="checkbox" id="toggleInflacionIng" onchange="renderIngresos()" style="accent-color:var(--teal-dark)"> Inflación acumulada</label>
+    </div>
+    <div class="card-body">
+      <div class="chart-wrap" style="height:260px"><canvas id="cIng1"></canvas></div>
+      <div class="legend" id="legIng1"></div>
+    </div>
+  </div>
+
+  <div class="charts-row2">
+    <div class="card" style="margin-bottom:0">
+      <div class="card-head"><span class="card-head-title">Distribución por fuente / categoría</span></div>
+      <div class="card-body">
+        <div class="chart-wrap" style="height:240px"><canvas id="cIng2"></canvas></div>
+        <div class="legend" id="legIng2"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:0">
+      <div class="card-head"><span class="card-head-title">Relación ingreso / gasto / inversión</span></div>
+      <div class="card-body">
+        <div class="chart-wrap" style="height:240px"><canvas id="cIng3"></canvas></div>
+        <div class="legend" id="legIng3"></div>
+      </div>
+    </div>
+  </div>
+  <div class="mb"></div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-head-title">Detalle por fuente</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Categoría / Fuente</th>
+            <th class="r">Total</th>
+            <th class="r">Prom. mensual</th>
+            <th class="r">% del total</th>
+          </tr></thead>
+          <tbody id="ingTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">Dashboard de gastos personales · v10 · datos en vivo desde Google Sheets</div>
 
 <script>
 const SHEET_ID   = '12dHWkxsXqbO6WqJmKMi0zfBsJmKbpegAgqp4TVA3zow';
@@ -848,6 +924,7 @@ let tableSort={col:'total',asc:false};
 let tableFilters={cat:null,sub:null};
 
 const fmt$=v=>'$'+Math.round(v).toLocaleString('es-AR');
+const fmtEjeY=v=>{const abs=Math.abs(v);if(abs>=1000000)return '$'+(v/1000000).toLocaleString('es-AR',{maximumFractionDigits:1})+'M';if(abs>=1000)return '$'+(v/1000).toFixed(0)+'K';return '$'+v;};
 const pct=(a,b)=>b===0?'—':(a/b*100).toFixed(1)+'%';
 const tickColor=()=>'#6b7280';
 const gridColor=()=>'rgba(16,24,40,0.06)';
@@ -904,7 +981,8 @@ function saldoPadres(){
 }
 
 // Reconstruye el cronograma restante de Santander a partir de los datos base.
-// Devuelve un array de cuotas: { n, fecha, cuotaTotal, saldoRestante }
+// Devuelve un array de cuotas: { n, fecha, fechaDate, cuotaTotal, saldoRestante }
+// Solo incluye cuotas cuyo mes/año es >= el mes actual.
 function cronogramaSantander(){
   const d=deudaSantanderData;
   if (!d || !d.saldoCapital) return [];
@@ -913,10 +991,11 @@ function cronogramaSantander(){
   const tasa=d.tasaMensual||0;
   const n=d.cuotasRestantes||0;
   const iva=0.21;
-  // Número de la primera cuota restante: total 36, quedan n -> primera = 37-n
   const primeraCuota=37-n;
-  // Fecha de la próxima cuota
   let fechaBase=parseFechaDDMMYYYY(d.proximaCuota);
+  // Umbral: primer día del mes actual
+  const hoy=new Date();
+  const mesActual=new Date(hoy.getFullYear(),hoy.getMonth(),1);
   const cuotas=[];
   for (let i=0;i<n;i++){
     const interes=saldo*tasa;
@@ -924,12 +1003,16 @@ function cronogramaSantander(){
     const amort=cuotaPura-interes;
     const cuotaTotal=amort+interes+ivaInt;
     const saldoNuevo=Math.max(saldo-amort,0);
+    let fechaDate=null;
     let fechaTexto='';
     if (fechaBase){
-      const f=new Date(fechaBase.getFullYear(),fechaBase.getMonth()+i,1);
-      fechaTexto=MESES_CORTO[f.getMonth()]+' '+f.getFullYear();
+      fechaDate=new Date(fechaBase.getFullYear(),fechaBase.getMonth()+i,1);
+      fechaTexto=MESES_CORTO[fechaDate.getMonth()]+' '+fechaDate.getFullYear();
     }
-    cuotas.push({n:primeraCuota+i,fecha:fechaTexto,cuotaTotal:cuotaTotal,saldoRestante:saldoNuevo});
+    // Solo incluir cuotas que aún no vencieron (mes >= mes actual)
+    if (!fechaDate || fechaDate >= mesActual){
+      cuotas.push({n:primeraCuota+i,fecha:fechaTexto,fechaDate,cuotaTotal,saldoRestante:saldoNuevo});
+    }
     saldo=saldoNuevo;
   }
   return cuotas;
@@ -1403,7 +1486,7 @@ function applyFilters(){
   DATA=filtered.filter(r=>r.tipo==='gasto');
   DATA_ING=filtered.filter(r=>r.tipo==='ingreso');
   DATA_INV=filtered.filter(r=>r.tipo==='inversión'||r.tipo==='inversion');
-  updateHeader();renderMetrics();buildC1();buildC2();buildC3();renderTable();renderAnalisis();renderFE();
+  updateHeader();renderMetrics();buildC1();buildC2();buildC3();renderTable();renderAnalisis();renderFE();renderIngresos();
 }
 
 function updateHeader(){
@@ -1459,32 +1542,33 @@ function buildC1(){
   const mI=document.getElementById('toggleInversion')?.checked!==false;
   const mInfl=document.getElementById('toggleInflacion')?.checked===true;
 
-  // Inflación acumulada: producto acumulado de (1 + var/100) para las keys disponibles
-  let inflAcum=null;
-  if (mInfl && Object.keys(INFLACION).length>0){
-    inflAcum=[];
-    let acum=100;
-    keys.forEach(k=>{
-      const v=INFLACION[k];
-      if (v!=null) acum=acum*(1+v/100);
-      inflAcum.push(Math.round(acum*10)/10);
-    });
-  }
-
   const ds=[
     {label:'Ingresos',data:ingresos,type:'line',borderColor:'#1DBFAA',backgroundColor:'transparent',tension:0.35,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2.5,yAxisID:'y'},
     {label:'Gastos',data:gastos,type:'line',borderColor:'#8B1A1A',backgroundColor:'transparent',tension:0.35,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2.5,yAxisID:'y'}
   ];
   if (mI) ds.push({label:'Inversión',data:inversiones,type:'bar',backgroundColor:'#6B4F9E',borderRadius:4,barPercentage:0.4,categoryPercentage:0.4,yAxisID:'y'});
-  if (inflAcum) ds.push({label:'Inflación acumulada',data:inflAcum,type:'line',borderColor:'#FFB81C',backgroundColor:'transparent',tension:0.3,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2,borderDash:[5,4],yAxisID:'y2'});
+
+  // Inflación acumulada: base = primer valor de gastos, mismo eje que gastos
+  if (mInfl && Object.keys(INFLACION).length>0){
+    const baseIdx=gastos.findIndex(v=>v>0);
+    if (baseIdx>=0){
+      const baseVal=gastos[baseIdx];
+      let rel=1.0;
+      const inflData=keys.map((k,i)=>{
+        if (i<baseIdx) return null;
+        if (i===baseIdx){ rel=1.0; return Math.round(baseVal); }
+        const v=INFLACION[k];
+        if (v!=null) rel=rel*(1+v/100);
+        return Math.round(baseVal*rel);
+      });
+      ds.push({label:'Inflación acumulada',data:inflData,type:'line',borderColor:'#FFB81C',backgroundColor:'transparent',tension:0.3,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2,borderDash:[5,4],yAxisID:'y'});
+    }
+  }
 
   const scales={
-    y:{beginAtZero:true,ticks:{callback:v=>{const m=v/1000000;return m===Math.round(m)&&Math.abs(m)>=1?'$'+m+'M':'$'+(v/1000).toFixed(0)+'K';},font:{size:11,family:'Source Sans 3'},color:tickColor()},grid:{color:gridColor(),drawTicks:false},border:{display:false}},
+    y:{beginAtZero:true,ticks:{callback:v=>fmtEjeY(v),font:{size:11,family:'Source Sans 3'},color:tickColor()},grid:{color:gridColor(),drawTicks:false},border:{display:false}},
     x:{ticks:{font:{size:11,family:'Source Sans 3'},color:tickColor()},grid:{display:false},border:{display:false}}
   };
-  if (inflAcum){
-    scales.y2={position:'right',ticks:{callback:v=>v.toFixed(0),font:{size:11,family:'Source Sans 3'},color:'#FFB81C'},grid:{display:false},border:{display:false}};
-  }
 
   if (c1Chart) c1Chart.destroy();
   c1Chart=new Chart(document.getElementById('c1'),{type:'bar',data:{labels,datasets:ds},options:{responsive:true,maintainAspectRatio:false,
@@ -1492,7 +1576,7 @@ function buildC1(){
     interaction:{mode:'index',intersect:false},
     plugins:{legend:{display:false},tooltip:{
       backgroundColor:'#1a1a1a',titleColor:'#fff',bodyColor:'#fff',padding:10,cornerRadius:6,titleFont:{size:12,weight:'500'},bodyFont:{size:13},
-      callbacks:{label:ctx=>ctx.dataset.yAxisID==='y2'?' '+ctx.dataset.label+': '+ctx.parsed.y.toFixed(1):' '+ctx.dataset.label+': '+fmt$(ctx.parsed.y)}}},
+      callbacks:{label:ctx=>' '+ctx.dataset.label+': '+fmt$(ctx.parsed.y)}}},
     scales}});
 }
 
@@ -1697,12 +1781,30 @@ function renderAnalisis(){
   });
   const eKeys=Object.keys(eb).sort();
   const eLabels=eKeys.map(k=>{const[y,m]=k.split('-');return MESES_LABEL[parseInt(m)-1]+(YEARS.length>1?' '+y:'');});
+  const eVals=eKeys.map(k=>Math.round(eb[k]));
+  const mInflEvol=document.getElementById('toggleInflacionEvol')?.checked===true;
+  const evolDs=[{label:cat,data:eVals,borderColor:color,backgroundColor:'transparent',tension:0.35,fill:false,borderWidth:2.5,pointRadius:0,pointHoverRadius:5}];
+  if (mInflEvol && Object.keys(INFLACION).length>0){
+    const baseIdx=eVals.findIndex(v=>v>0);
+    if (baseIdx>=0){
+      const baseVal=eVals[baseIdx];
+      let rel=1.0;
+      const inflData=eKeys.map((k,i)=>{
+        if (i<baseIdx) return null;
+        if (i===baseIdx){ rel=1.0; return Math.round(baseVal); }
+        const v=INFLACION[k];
+        if (v!=null) rel=rel*(1+v/100);
+        return Math.round(baseVal*rel);
+      });
+      evolDs.push({label:'Inflación acumulada',data:inflData,borderColor:'#FFB81C',backgroundColor:'transparent',tension:0.3,fill:false,borderWidth:2,borderDash:[5,4],pointRadius:0,pointHoverRadius:5});
+    }
+  }
   if (cEvolChart) cEvolChart.destroy();
-  cEvolChart=new Chart(document.getElementById('cEvol'),{type:'line',data:{labels:eLabels,datasets:[{label:cat,data:eKeys.map(k=>Math.round(eb[k])),borderColor:color,backgroundColor:'transparent',tension:0.35,fill:false,borderWidth:2.5,pointRadius:0,pointHoverRadius:5}]},
+  cEvolChart=new Chart(document.getElementById('cEvol'),{type:'line',data:{labels:eLabels,datasets:evolDs},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-    plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1a1a',titleColor:'#fff',bodyColor:'#fff',padding:10,cornerRadius:6,callbacks:{label:ctx=>' '+fmt$(ctx.parsed.y)}}},
-    scales:{y:{ticks:{callback:v=>fmt$(v),font:{size:11,family:'Source Sans 3'},color:tickColor()},grid:{color:gridColor(),drawTicks:false},border:{display:false}},x:{ticks:{font:{size:11,family:'Source Sans 3'},color:tickColor()},grid:{display:false},border:{display:false}}}}});
-  document.getElementById('legEvol').innerHTML=`<div class="legend-item"><span class="legend-dot" style="background:${color}"></span>${cat}</div>`;
+    plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1a1a',titleColor:'#fff',bodyColor:'#fff',padding:10,cornerRadius:6,callbacks:{label:ctx=>' '+ctx.dataset.label+': '+fmt$(ctx.parsed.y)}}},
+    scales:{y:{ticks:{callback:v=>fmtEjeY(v),font:{size:11,family:'Source Sans 3'},color:tickColor()},grid:{color:gridColor(),drawTicks:false},border:{display:false}},x:{ticks:{font:{size:11,family:'Source Sans 3'},color:tickColor()},grid:{display:false},border:{display:false}}}}});
+  document.getElementById('legEvol').innerHTML=`<div class="legend-item"><span class="legend-dot" style="background:${color}"></span>${cat}</div>`+(mInflEvol?`<div class="legend-item"><span class="legend-dot" style="background:#FFB81C"></span>Inflación acumulada</div>`:'');
   const otro=tG-catTotal;
   document.getElementById('pie1Title').textContent=`${cat} en el gasto total`;
   if (cPie1Chart) cPie1Chart.destroy();
@@ -1915,6 +2017,111 @@ function renderFeProgreso(objetivo){
 }
 
 function toggleDrop(id){document.getElementById(id).classList.toggle('open');}
+
+/* ======================== INGRESOS ======================== */
+let cIng1Chart,cIng2Chart,cIng3Chart;
+function renderIngresos(){
+  const tI=DATA_ING.reduce((s,r)=>s+r.monto,0);
+  const tG=DATA.reduce((s,r)=>s+r.monto,0);
+  const tV=DATA_INV.reduce((s,r)=>s+r.monto,0);
+  const meses=[...new Set(DATA_ING.map(r=>r.year+'-'+r.month))].length||1;
+  const prom=tI/meses;
+  const aho=tI-tG;
+
+  document.getElementById('ingTotal').textContent=fmt$(tI);
+  document.getElementById('ingTotalSub').textContent=DATA_ING.length+' transacciones';
+  document.getElementById('ingProm').textContent=fmt$(prom);
+  document.getElementById('ingPromSub').textContent='por mes';
+  document.getElementById('ingMeses').textContent=meses;
+  document.getElementById('ingMesesSub').textContent=YEARS.length>1?YEARS.join(', '):(YEARS[0]||'');
+  const tasaEl=document.getElementById('ingTasaAhorro');
+  const tasa=tI>0?aho/tI*100:0;
+  tasaEl.textContent=tasa.toFixed(1)+'%';
+  tasaEl.style.color=tasa>=0?'var(--teal-mid)':'var(--coral)';
+  document.getElementById('ingTasaAhorroSub').textContent=tI>0?(aho>=0?'ingreso - gastos':'gastos > ingresos'):'—';
+
+  // Gráfico 1: evolución mensual de ingresos + inflación opcional
+  const bk={};
+  RAW.forEach(r=>{
+    if (filteredYear&&String(r.year)!==filteredYear) return;
+    if (r.tipo!=='ingreso') return;
+    const k=r.year+'-'+String(r.month).padStart(2,'0');
+    bk[k]=(bk[k]||0)+r.monto;
+  });
+  const keys=Object.keys(bk).sort();
+  const labels=keys.map(k=>{const[y,m]=k.split('-');return MESES_LABEL[parseInt(m)-1]+(YEARS.length>1?' '+y:'');});
+  const vals=keys.map(k=>Math.round(bk[k]));
+  const mInfl=document.getElementById('toggleInflacionIng')?.checked===true;
+  const ing1Ds=[{label:'Ingresos',data:vals,borderColor:'#1DBFAA',backgroundColor:'rgba(29,191,170,0.07)',tension:0.35,fill:true,borderWidth:2.5,pointRadius:0,pointHoverRadius:5}];
+  if (mInfl && Object.keys(INFLACION).length>0){
+    const baseIdx=vals.findIndex(v=>v>0);
+    if (baseIdx>=0){
+      const baseVal=vals[baseIdx];let rel=1.0;
+      const inflData=keys.map((k,i)=>{
+        if (i<baseIdx) return null;
+        if (i===baseIdx){rel=1.0;return Math.round(baseVal);}
+        const v=INFLACION[k];if (v!=null) rel=rel*(1+v/100);
+        return Math.round(baseVal*rel);
+      });
+      ing1Ds.push({label:'Inflación acumulada',data:inflData,borderColor:'#FFB81C',backgroundColor:'transparent',tension:0.3,fill:false,borderWidth:2,borderDash:[5,4],pointRadius:0,pointHoverRadius:5});
+    }
+  }
+  if (cIng1Chart) cIng1Chart.destroy();
+  cIng1Chart=new Chart(document.getElementById('cIng1'),{type:'line',data:{labels,datasets:ing1Ds},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+    plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1a1a',titleColor:'#fff',bodyColor:'#fff',padding:10,cornerRadius:6,callbacks:{label:ctx=>' '+ctx.dataset.label+': '+fmt$(ctx.parsed.y)}}},
+    scales:{y:{beginAtZero:false,ticks:{callback:v=>fmtEjeY(v),font:{size:11,family:'Source Sans 3'},color:tickColor()},grid:{color:gridColor(),drawTicks:false},border:{display:false}},x:{ticks:{font:{size:11,family:'Source Sans 3'},color:tickColor()},grid:{display:false},border:{display:false}}}}});
+  const legIng1=document.getElementById('legIng1');
+  legIng1.innerHTML=`<div class="legend-item"><span class="legend-dot" style="background:#1DBFAA"></span>Ingresos</div>`+(mInfl?`<div class="legend-item"><span class="legend-dot" style="background:#FFB81C"></span>Inflación acumulada</div>`:'');
+
+  // Gráfico 2: distribución por categoría/fuente (doughnut)
+  const catMap={};
+  DATA_ING.forEach(r=>{catMap[r.categoria]=(catMap[r.categoria]||0)+r.monto;});
+  const cats2=Object.keys(catMap).sort((a,b)=>catMap[b]-catMap[a]);
+  const total2=cats2.reduce((s,c)=>s+catMap[c],0);
+  const colors2=cats2.map(c=>CAT_COLOR_MAP[c]||CAT_COLOR[c]||'#888');
+  if (cIng2Chart) cIng2Chart.destroy();
+  if (cats2.length){
+    cIng2Chart=new Chart(document.getElementById('cIng2'),{type:'doughnut',data:{labels:cats2,datasets:[{data:cats2.map(c=>Math.round(catMap[c])),backgroundColor:colors2,borderWidth:2,borderColor:'#ffffff',hoverOffset:6}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1a1a',titleColor:'#fff',bodyColor:'#fff',padding:10,cornerRadius:6,callbacks:{label:ctx=>` ${ctx.label}: ${fmt$(ctx.parsed)} (${(ctx.parsed/total2*100).toFixed(1)}%)`}}},cutout:'68%'}});
+    document.getElementById('legIng2').innerHTML=cats2.map((c,i)=>`<div class="legend-item"><span class="legend-dot" style="background:${colors2[i]}"></span>${c} ${(catMap[c]/total2*100).toFixed(1)}%</div>`).join('');
+  }
+
+  // Gráfico 3: ingreso vs gasto vs inversión (doughnut de destino del ingreso)
+  const aho3=Math.max(tI-tG-tV,0);
+  const ing3Labels=['Gastos','Inversión','Ahorro neto'];
+  const ing3Vals=[Math.round(tG),Math.round(tV),Math.round(aho3)];
+  const ing3Colors=['#8B1A1A','#6B4F9E','#1DBFAA'];
+  if (cIng3Chart) cIng3Chart.destroy();
+  if (tI>0){
+    cIng3Chart=new Chart(document.getElementById('cIng3'),{type:'doughnut',data:{labels:ing3Labels,datasets:[{data:ing3Vals,backgroundColor:ing3Colors,borderWidth:2,borderColor:'#ffffff',hoverOffset:6}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1a1a',titleColor:'#fff',bodyColor:'#fff',padding:10,cornerRadius:6,callbacks:{label:ctx=>` ${ctx.label}: ${fmt$(ctx.parsed)} (${(ctx.parsed/tI*100).toFixed(1)}%)`}}},cutout:'68%'}});
+    document.getElementById('legIng3').innerHTML=ing3Labels.map((l,i)=>`<div class="legend-item"><span class="legend-dot" style="background:${ing3Colors[i]}"></span>${l} ${(ing3Vals[i]/tI*100).toFixed(1)}%</div>`).join('');
+  }
+
+  // Tabla detalle por fuente/categoría
+  const tbody=document.getElementById('ingTbody');tbody.innerHTML='';
+  cats2.forEach(c=>{
+    const tr=document.createElement('tr');
+    const acc=colors2[cats2.indexOf(c)];
+    tr.innerHTML=`<td style="border-left:3px solid ${acc};font-weight:600;">${c}</td>
+      <td class="r mono">${fmt$(catMap[c])}</td>
+      <td class="r mono" style="color:${acc};font-weight:500;">${fmt$(catMap[c]/meses)}</td>
+      <td class="r mono" style="color:var(--muted);">${(catMap[c]/total2*100).toFixed(1)}%</td>`;
+    tbody.appendChild(tr);
+    // filas por subcategoría
+    const subMap2={};
+    DATA_ING.filter(r=>r.categoria===c).forEach(r=>{subMap2[r.subcategoria]=(subMap2[r.subcategoria]||0)+r.monto;});
+    Object.keys(subMap2).sort((a,b)=>subMap2[b]-subMap2[a]).forEach(s=>{
+      const tr2=document.createElement('tr');
+      tr2.innerHTML=`<td style="padding-left:28px;color:var(--muted);">${s}</td>
+        <td class="r mono" style="color:var(--muted);">${fmt$(subMap2[s])}</td>
+        <td class="r mono" style="color:var(--muted);">${fmt$(subMap2[s]/meses)}</td>
+        <td class="r mono" style="color:var(--muted);">${(subMap2[s]/total2*100).toFixed(1)}%</td>`;
+      tbody.appendChild(tr2);
+    });
+  });
+}
 document.addEventListener('click',e=>{if(!e.target.closest('.drop-wrap'))document.querySelectorAll('.dropdown').forEach(d=>d.classList.remove('open'));});
 document.addEventListener('click',e=>{if(!e.target.closest('.th-filter-wrap')){document.querySelectorAll('.col-filter-panel').forEach(p=>p.classList.remove('open'));if(typeof ajustarAlturaFiltro==='function')ajustarAlturaFiltro();}});
 
