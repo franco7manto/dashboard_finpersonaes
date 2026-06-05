@@ -995,7 +995,7 @@ function cronogramaSantander(){
   let fechaBase=parseFechaDDMMYYYY(d.proximaCuota);
   // Umbral: primer día del mes actual
   const hoy=new Date();
-  const mesActual=new Date(hoy.getFullYear(),hoy.getMonth(),1);
+  const mesActual=new Date(hoy.getFullYear(),hoy.getMonth()+1,1);
   const cuotas=[];
   for (let i=0;i<n;i++){
     const interes=saldo*tasa;
