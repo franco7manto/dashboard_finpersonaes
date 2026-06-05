@@ -533,14 +533,16 @@
       <span class="card-head-title">Evolución mensual — gastos vs ingresos</span>
       <div class="head-toggles">
         <label><input type="checkbox" id="toggleInversion" checked onchange="buildC1()"> Inversión</label>
+        <label><input type="checkbox" id="toggleInflacion" onchange="buildC1()"> Inflación acumulada</label>
       </div>
     </div>
     <div class="card-body">
       <div class="chart-wrap" style="height:260px"><canvas id="c1"></canvas></div>
       <div class="legend">
         <div class="legend-item"><span class="legend-dot" style="background:var(--teal-mid)"></span>Ingresos</div>
-        <div class="legend-item"><span class="legend-dot" style="background:var(--teal-dark)"></span>Gastos</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#8B1A1A"></span>Gastos</div>
         <div class="legend-item"><span class="legend-dot" style="background:var(--purple)"></span>Inversión</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#FFB81C;border:1px dashed #FFB81C;border-radius:0"></span>Inflación acumulada (eje der.)</div>
       </div>
     </div>
   </div>
@@ -819,12 +821,13 @@
   </div>
 </div>
 
-<div class="footer">Dashboard de gastos personales · v8 · datos en vivo desde Google Sheets</div>
+<div class="footer">Dashboard de gastos personales · v9 · datos en vivo desde Google Sheets</div>
 
 <script>
 const SHEET_ID   = '12dHWkxsXqbO6WqJmKMi0zfBsJmKbpegAgqp4TVA3zow';
 const SHEET_NAME = 'DatosDash';
 const SHEET_GID  = '1290408190';
+const INFLACION_GID = '1958954131';
 const FE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwI6_9OP0ZFjogFz1Kg-bubofFnjyG7vpBuEhFAlsJWFNvsk9jj8QkPcwvwj34NbfoKtQ/exec';
 const MESES_LABEL  = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -839,6 +842,7 @@ const CAT_COLOR_MAP = {
 };
 const CAT_COLOR={}, CAT_BG={}, CAT_SHADES={};
 let RAW=[],DATA=[],DATA_ING=[],DATA_INV=[],YEARS=[],CATS=[];
+let INFLACION={}; // { 'YYYY-MM': variacionMensual% }
 let filteredYear='';
 let tableSort={col:'total',asc:false};
 let tableFilters={cat:null,sub:null};
@@ -1157,13 +1161,15 @@ async function registrarPago(){
 
 async function loadSheets() {
   const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`;
+  const urlInfl=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${INFLACION_GID}`;
   try {
-    const resp=await fetch(url);
+    const [resp,respInfl]=await Promise.all([fetch(url),fetch(urlInfl)]);
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     parseCSV(await resp.text());
+    if (respInfl.ok) parseInflacion(await respInfl.text());
     initDashboard();
     document.getElementById('loadingOverlay').style.display='none';
-    cargarFEConfig(); // carga config y activos del fondo de emergencia (no bloquea el dashboard)
+    cargarFEConfig();
   } catch(e) {
     document.getElementById('loadingMsg').style.display='none';
     document.getElementById('errorBox').style.display='block';
@@ -1305,6 +1311,26 @@ function parseCSV(csv) {
   YEARS=[...new Set(RAW.map(r=>r.year))].sort();
 }
 
+function parseInflacion(csv){
+  INFLACION={};
+  const lines=csv.trim().split('\n');
+  const header=lines[0].split(',').map(h=>h.replace(/"/g,'').trim().toLowerCase());
+  const iAnio=header.findIndex(h=>h.includes('anio')||h.includes('año'));
+  const iMes=header.findIndex(h=>h.includes('mes'));
+  const iVar=header.findIndex(h=>h.includes('variacion')||h.includes('variación')||h.includes('ipc'));
+  if (iAnio<0||iMes<0||iVar<0) return;
+  for (let i=1;i<lines.length;i++){
+    const cols=splitCSVLine(lines[i]);
+    if (!cols||cols.length<3) continue;
+    const get=idx=>(cols[idx]||'').replace(/"/g,'').replace(',','.').trim();
+    const anio=parseInt(get(iAnio));const mes=parseInt(get(iMes));
+    const vari=parseFloat(get(iVar));
+    if (isNaN(anio)||isNaN(mes)||isNaN(vari)) continue;
+    const k=anio+'-'+String(mes).padStart(2,'0');
+    INFLACION[k]=vari;
+  }
+}
+
 function parseDate(s) {
   s=s.trim(); let m;
   if ((m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/))) {
@@ -1431,21 +1457,43 @@ function buildC1(){
   const ingresos=keys.map(k=>Math.round(bk[k].ingreso));
   const inversiones=keys.map(k=>Math.round(bk[k].inversion));
   const mI=document.getElementById('toggleInversion')?.checked!==false;
+  const mInfl=document.getElementById('toggleInflacion')?.checked===true;
+
+  // Inflación acumulada: producto acumulado de (1 + var/100) para las keys disponibles
+  let inflAcum=null;
+  if (mInfl && Object.keys(INFLACION).length>0){
+    inflAcum=[];
+    let acum=100;
+    keys.forEach(k=>{
+      const v=INFLACION[k];
+      if (v!=null) acum=acum*(1+v/100);
+      inflAcum.push(Math.round(acum*10)/10);
+    });
+  }
+
   const ds=[
-    {label:'Ingresos',data:ingresos,type:'line',borderColor:'#1DBFAA',backgroundColor:'transparent',tension:0.35,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2.5},
-    {label:'Gastos',data:gastos,type:'line',borderColor:'#006B5F',backgroundColor:'transparent',tension:0.35,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2.5}
+    {label:'Ingresos',data:ingresos,type:'line',borderColor:'#1DBFAA',backgroundColor:'transparent',tension:0.35,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2.5,yAxisID:'y'},
+    {label:'Gastos',data:gastos,type:'line',borderColor:'#8B1A1A',backgroundColor:'transparent',tension:0.35,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2.5,yAxisID:'y'}
   ];
-  if (mI) ds.push({label:'Inversión',data:inversiones,type:'bar',backgroundColor:'#6B4F9E',borderRadius:4,barPercentage:0.4,categoryPercentage:0.4});
+  if (mI) ds.push({label:'Inversión',data:inversiones,type:'bar',backgroundColor:'#6B4F9E',borderRadius:4,barPercentage:0.4,categoryPercentage:0.4,yAxisID:'y'});
+  if (inflAcum) ds.push({label:'Inflación acumulada',data:inflAcum,type:'line',borderColor:'#FFB81C',backgroundColor:'transparent',tension:0.3,pointRadius:0,pointHoverRadius:5,fill:false,borderWidth:2,borderDash:[5,4],yAxisID:'y2'});
+
+  const scales={
+    y:{beginAtZero:true,ticks:{callback:v=>{const m=v/1000000;return m===Math.round(m)&&Math.abs(m)>=1?'$'+m+'M':'$'+(v/1000).toFixed(0)+'K';},font:{size:11,family:'Source Sans 3'},color:tickColor()},grid:{color:gridColor(),drawTicks:false},border:{display:false}},
+    x:{ticks:{font:{size:11,family:'Source Sans 3'},color:tickColor()},grid:{display:false},border:{display:false}}
+  };
+  if (inflAcum){
+    scales.y2={position:'right',ticks:{callback:v=>v.toFixed(0),font:{size:11,family:'Source Sans 3'},color:'#FFB81C'},grid:{display:false},border:{display:false}};
+  }
+
   if (c1Chart) c1Chart.destroy();
   c1Chart=new Chart(document.getElementById('c1'),{type:'bar',data:{labels,datasets:ds},options:{responsive:true,maintainAspectRatio:false,
     layout:{padding:{left:10,right:10}},
     interaction:{mode:'index',intersect:false},
     plugins:{legend:{display:false},tooltip:{
       backgroundColor:'#1a1a1a',titleColor:'#fff',bodyColor:'#fff',padding:10,cornerRadius:6,titleFont:{size:12,weight:'500'},bodyFont:{size:13},
-      callbacks:{label:ctx=>' '+ctx.dataset.label+': '+fmt$(ctx.parsed.y)}}},
-    scales:{
-      y:{beginAtZero:true,ticks:{callback:v=>{const m=v/1000000;return m===Math.round(m)&&Math.abs(m)>=1?'$'+m+'M':'$'+(v/1000).toFixed(0)+'K';},font:{size:11,family:'Source Sans 3'},color:tickColor()},grid:{color:gridColor(),drawTicks:false},border:{display:false}},
-      x:{ticks:{font:{size:11,family:'Source Sans 3'},color:tickColor()},grid:{display:false},border:{display:false}}}}});
+      callbacks:{label:ctx=>ctx.dataset.yAxisID==='y2'?' '+ctx.dataset.label+': '+ctx.parsed.y.toFixed(1):' '+ctx.dataset.label+': '+fmt$(ctx.parsed.y)}}},
+    scales}});
 }
 
 let c2Chart;
