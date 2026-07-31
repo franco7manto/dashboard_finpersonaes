@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet"/>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -73,6 +74,36 @@
     #loadingMsg { font-size: 13px; color: var(--muted); }
     #errorBox { display: none; background: #fff5f4; border: 1px solid var(--coral); border-radius: var(--radius-sm); padding: 16px 20px; max-width: 480px; text-align: center; }
     #errorBox p { font-size: 13px; color: var(--coral); }
+
+    /* login */
+    #loginOverlay {
+      position: fixed; inset: 0; background: var(--bg-soft); z-index: 10000;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+    }
+    #loginOverlay h1 {
+      font-family: var(--font-serif); font-size: 28px; font-weight: 500;
+      color: var(--ink); letter-spacing: -0.5px;
+    }
+    #loginOverlay p { font-size: 13.5px; color: var(--muted); text-align: center; max-width: 320px; line-height: 1.5; }
+    #loginBtnWrap { margin-top: 4px; }
+    #loginDenied {
+      display: none; background: #fff5f4; border: 1px solid var(--coral); border-radius: var(--radius-sm);
+      padding: 14px 20px; max-width: 340px; text-align: center;
+    }
+    #loginDenied p { font-size: 13px; color: var(--coral); margin: 0; max-width: none; }
+
+    /* barra de usuario logueado, arriba a la derecha */
+    #userBar {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 12.5px; color: var(--muted);
+    }
+    #userBar img { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border); }
+    #logoutBtn {
+      font-family: var(--font-sans); font-size: 12px; padding: 5px 10px;
+      border-radius: var(--radius-sm); border: 1px solid var(--border-strong);
+      background: var(--bg); color: var(--muted); cursor: pointer;
+    }
+    #logoutBtn:hover { border-color: var(--coral); color: var(--coral); }
 
     /* header */
     .header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 1.75rem; flex-wrap: wrap; gap: 1rem; }
@@ -452,7 +483,14 @@
 </head>
 <body>
 
-<div id="loadingOverlay">
+<div id="loginOverlay">
+  <h1>Dashboard de gastos</h1>
+  <p>Iniciá sesión con tu cuenta de Google para acceder a tus datos.</p>
+  <div id="loginBtnWrap"></div>
+  <div id="loginDenied"><p>Esta cuenta no tiene acceso a este dashboard.</p></div>
+</div>
+
+<div id="loadingOverlay" style="display:none">
   <div class="spinner"></div>
   <div id="loadingMsg">Cargando datos desde Google Sheets…</div>
   <div id="errorBox"><p id="errorMsg">Error al cargar datos.</p></div>
@@ -464,6 +502,7 @@
     <p id="headerSub">Cargando…</p>
   </div>
   <div class="header-right">
+    <div id="userBar" style="display:none"></div>
     <select id="selAnio" onchange="applyFilters()"><option value="">Todos los años</option></select>
     <div class="drop-wrap" id="mesDrop">
       <button class="drop-btn" onclick="toggleDrop('ddMes')">Meses: <span id="mesBadge" style="font-size:12px;color:var(--muted)">Todos ▾</span></button>
@@ -900,11 +939,16 @@
 <div class="footer">Dashboard de gastos personales · v10 · datos en vivo desde Google Sheets</div>
 
 <script>
-const SHEET_ID   = '12dHWkxsXqbO6WqJmKMi0zfBsJmKbpegAgqp4TVA3zow';
-const SHEET_NAME = 'DatosDash';
-const SHEET_GID  = '1290408190';
-const INFLACION_GID = '1958954131';
+// URL del Apps Script — ahora es la ÚNICA fuente de datos (lectura y escritura).
+// Ya no hay CSV público: todo pasa por acá, autenticado.
 const FE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwI6_9OP0ZFjogFz1Kg-bubofFnjyG7vpBuEhFAlsJWFNvsk9jj8QkPcwvwj34NbfoKtQ/exec';
+
+// Client ID de Google Identity Services (se genera en Google Cloud Console).
+const GOOGLE_CLIENT_ID = '415658713927-4ca5sofo7h3rujde30tba8qeromv673h.apps.googleusercontent.com';
+
+// Token de sesión actual. Vive solo en memoria (variable JS), nunca en
+// localStorage ni en el HTML: si recargás la página, hay que loguearse de nuevo.
+let authToken = null;
 const MESES_LABEL  = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const SHORT_MESES  = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
@@ -928,6 +972,63 @@ const fmtEjeY=v=>{const abs=Math.abs(v);if(abs>=1000000)return '$'+(v/1000000).t
 const pct=(a,b)=>b===0?'—':(a/b*100).toFixed(1)+'%';
 const tickColor=()=>'#6b7280';
 const gridColor=()=>'rgba(16,24,40,0.06)';
+
+/* ============================ AUTENTICACIÓN ============================ */
+
+// Se ejecuta cuando la librería de Google Identity Services termina de cargar.
+window.onload = function(){
+  if (typeof google === 'undefined' || !google.accounts) {
+    document.getElementById('loginDenied').style.display='block';
+    document.querySelector('#loginDenied p').textContent='No se pudo cargar el sistema de login de Google. Revisá tu conexión y recargá.';
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: onGoogleLogin
+  });
+  google.accounts.id.renderButton(
+    document.getElementById('loginBtnWrap'),
+    { theme:'outline', size:'large', text:'signin_with', shape:'pill' }
+  );
+};
+
+// Callback cuando Google confirma el login. credentialResponse.credential es
+// el "id_token": un comprobante firmado de que sos vos, con tu email adentro.
+function onGoogleLogin(credentialResponse){
+  authToken = credentialResponse.credential;
+  document.getElementById('loginDenied').style.display='none';
+  // Decodificamos el token localmente solo para mostrar el nombre/foto en la UI.
+  // Esto NO reemplaza la verificación real, que hace el Apps Script del lado del servidor.
+  const datosUsuario = decodificarTokenLocal_(authToken);
+  mostrarUserBar_(datosUsuario);
+  iniciarCarga();
+}
+
+function decodificarTokenLocal_(token){
+  try {
+    const payload = token.split('.')[1];
+    return JSON.parse(atob(payload.replace(/-/g,'+').replace(/_/g,'/')));
+  } catch(e){ return {}; }
+}
+
+function mostrarUserBar_(datosUsuario){
+  const bar=document.getElementById('userBar');
+  bar.style.display='flex';
+  bar.innerHTML=`${datosUsuario.picture?`<img src="${datosUsuario.picture}" alt=""/>`:''}<span>${datosUsuario.name||datosUsuario.email||''}</span><button id="logoutBtn" onclick="cerrarSesion()">Salir</button>`;
+}
+
+function cerrarSesion(){
+  authToken=null;
+  if (typeof google!=='undefined' && google.accounts) google.accounts.id.disableAutoSelect();
+  location.reload();
+}
+
+// Arranca la carga de datos real solo después de tener un token.
+function iniciarCarga(){
+  document.getElementById('loginOverlay').style.display='none';
+  document.getElementById('loadingOverlay').style.display='flex';
+  loadSheets();
+}
 
 function switchTab(btn,id) {
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
@@ -1225,9 +1326,10 @@ async function registrarPago(){
     const resp=await fetch(FE_SCRIPT_URL,{
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({accion:'agregarPago',pago:{fecha:fecha,monto:monto}})
+      body:JSON.stringify({token:authToken,accion:'agregarPago',pago:{fecha:fecha,monto:monto}})
     });
     const data=await resp.json();
+    if (data.error==='No autorizado') { mostrarAccesoDenegado_(); return; }
     if (!data.ok) throw new Error(data.error||'respuesta inesperada');
     // Agregar el pago localmente para no tener que recargar todo
     pagosPadresData.push({fecha:fecha,monto:monto});
@@ -1242,88 +1344,89 @@ async function registrarPago(){
   }
 }
 
+// Carga TODO desde el Apps Script autenticado: datos, inflación, FE, deuda.
+// Reemplaza a la vieja loadSheets() que leía CSV público directo de Sheets.
 async function loadSheets() {
-  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`;
-  const urlInfl=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${INFLACION_GID}`;
   try {
-    const [resp,respInfl]=await Promise.all([fetch(url),fetch(urlInfl)]);
+    const resp=await fetch(`${FE_SCRIPT_URL}?token=${encodeURIComponent(authToken)}`);
     if (!resp.ok) throw new Error('HTTP '+resp.status);
-    parseCSV(await resp.text());
-    if (respInfl.ok) parseInflacion(await respInfl.text());
+    const data=await resp.json();
+    if (data.error==='No autorizado') { mostrarAccesoDenegado_(); return; }
+    if (data.error) throw new Error(data.error);
+
+    parseFilas(data.datos||[]);
+    parseInflacionFilas(data.inflacion||[]);
     initDashboard();
     document.getElementById('loadingOverlay').style.display='none';
-    cargarFEConfig();
+
+    aplicarFEyDeuda_(data);
   } catch(e) {
     document.getElementById('loadingMsg').style.display='none';
     document.getElementById('errorBox').style.display='block';
-    document.getElementById('errorMsg').textContent='No se pudo cargar la planilla. Verificá que esté pública y recargá la página. ('+e.message+')';
+    document.getElementById('errorMsg').textContent='No se pudo cargar la planilla. ('+e.message+')';
   }
 }
 
-// Carga la config guardada (montos a cubrir, meses) y los activos desde el Apps Script
-async function cargarFEConfig(){
+// Cuando el Apps Script rechaza el token (email no autorizado)
+function mostrarAccesoDenegado_(){
+  document.getElementById('loadingOverlay').style.display='none';
+  document.getElementById('loginOverlay').style.display='flex';
+  document.getElementById('loginDenied').style.display='block';
+  authToken=null;
+}
+
+// Aplica los datos de FE y deuda que ya vinieron en la misma respuesta de loadSheets.
+// Antes esto era una llamada aparte (cargarFEConfig); ahora todo viaja junto.
+function aplicarFEyDeuda_(data){
   const status=document.getElementById('feSaveStatus');
-  if (status){status.textContent='Cargando configuración…';status.style.color='var(--muted)';}
-  try {
-    const resp=await fetch(FE_SCRIPT_URL);
-    if (!resp.ok) throw new Error('HTTP '+resp.status);
-    const data=await resp.json();
-    if (data.error) throw new Error(data.error);
 
-    // Activos (solo lectura)
-    activosSeguros=[];activosVariables=[];
-    (data.activos||[]).forEach(a=>{
-      const item={nombre:a.nombre,monto:a.monto};
-      if (a.tipo==='seguro') activosSeguros.push(item);
-      else if (a.tipo==='variable') activosVariables.push(item);
-    });
+  // Activos (solo lectura)
+  activosSeguros=[];activosVariables=[];
+  (data.activos||[]).forEach(a=>{
+    const item={nombre:a.nombre,monto:a.monto};
+    if (a.tipo==='seguro') activosSeguros.push(item);
+    else if (a.tipo==='variable') activosVariables.push(item);
+  });
 
-    // Config: montos a cubrir guardados + meses
-    (data.config||[]).forEach(c=>{
-      if (c.categoria==='__config__'){
-        if (c.subcategoria==='meses' && c.montoAjustado>0){
-          feState.meses=c.montoAjustado;
-          document.querySelectorAll('#mesesToggle button').forEach(b=>{
-            b.classList.toggle('active', b.textContent.trim().startsWith(String(c.montoAjustado)));
-          });
-        }
-      } else {
-        const key=feKey(c.categoria,c.subcategoria);
-        feState.ajustados[key]=c.montoAjustado;
+  // Config: montos a cubrir guardados + meses
+  (data.config||[]).forEach(c=>{
+    if (c.categoria==='__config__'){
+      if (c.subcategoria==='meses' && c.montoAjustado>0){
+        feState.meses=c.montoAjustado;
+        document.querySelectorAll('#mesesToggle button').forEach(b=>{
+          b.classList.toggle('active', b.textContent.trim().startsWith(String(c.montoAjustado)));
+        });
       }
-    });
-
-    feConfigLoaded=true;
-    renderFE(); // re-render con los valores cargados
-    feDirty=false;
-    const btn=document.getElementById('feSaveBtn');
-    if (btn) btn.disabled=true;
-    if (status){
-      const hayConfig=(data.config||[]).length>0;
-      status.textContent=hayConfig?'Configuración cargada':'Sin configuración guardada aún';
-      status.style.color='var(--muted)';
+    } else {
+      const key=feKey(c.categoria,c.subcategoria);
+      feState.ajustados[key]=c.montoAjustado;
     }
+  });
 
-    // DEUDAS: guardar datos crudos y renderizar la tab de control de deuda
-    deudaPadresData=data.deudaPadres||[];
-    deudaSantanderData=data.deudaSantander||{};
-    pagosPadresData=data.pagosPadres||[];
-    renderDeuda();
-  } catch(e){
-    if (status){status.textContent='No se pudo cargar la configuración guardada';status.style.color='var(--coral,#c0392b)';}
-    // Igual renderizamos los activos vacíos / lo que haya
-    renderFE();
+  feConfigLoaded=true;
+  renderFE();
+  feDirty=false;
+  const btn=document.getElementById('feSaveBtn');
+  if (btn) btn.disabled=true;
+  if (status){
+    const hayConfig=(data.config||[]).length>0;
+    status.textContent=hayConfig?'Configuración cargada':'Sin configuración guardada aún';
+    status.style.color='var(--muted)';
   }
+
+  deudaPadresData=data.deudaPadres||[];
+  deudaSantanderData=data.deudaSantander||{};
+  pagosPadresData=data.pagosPadres||[];
+  renderDeuda();
 }
 
-// Guarda la config actual en Sheets vía el Apps Script
+// Guarda la config actual en Sheets vía el Apps Script (autenticado)
 async function feGuardar(){
   const btn=document.getElementById('feSaveBtn');
   const status=document.getElementById('feSaveStatus');
   if (btn) btn.disabled=true;
   if (status){status.textContent='Guardando…';status.style.color='var(--muted)';}
 
-  // Armar la config: una fila por subcategoría existente + fila __config__ para meses
   const seen={};
   const config=[];
   DATA.forEach(r=>{
@@ -1337,17 +1440,16 @@ async function feGuardar(){
       ponderador:1
     });
   });
-  // Fila de parámetros generales
   config.push({categoria:'__config__',subcategoria:'meses',montoAjustado:feState.meses,ponderador:1});
 
   try {
-    // text/plain evita el preflight CORS que bloquearía la escritura
     const resp=await fetch(FE_SCRIPT_URL,{
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({config})
+      body:JSON.stringify({token:authToken,config})
     });
     const data=await resp.json();
+    if (data.error==='No autorizado') { mostrarAccesoDenegado_(); return; }
     if (!data.ok) throw new Error(data.error||'respuesta inesperada');
     feDirty=false;
     if (status){
@@ -1362,6 +1464,57 @@ async function feGuardar(){
   }
 }
 
+
+// Versión nueva: recibe un array de objetos (uno por fila de la hoja),
+// tal como los devuelve el Apps Script. Reemplaza a parseCSV, que parseaba
+// texto CSV plano — ya no lo necesitamos porque los datos llegan como JSON.
+function parseFilas(filas){
+  RAW=[];
+  if (!filas.length){ YEARS=[]; return; }
+  // Detectamos a qué clave del objeto corresponde cada campo, igual que
+  // antes se detectaba con el header del CSV (por si los nombres de columna
+  // no calzan exacto, ej. "Fecha" vs "fecha").
+  const keys=Object.keys(filas[0]);
+  const findKey=(needle)=>keys.find(k=>k.toLowerCase().includes(needle));
+  const kFecha=findKey('fecha'), kMonto=findKey('monto'), kCategoria=findKey('categor'),
+        kSub=findKey('subcategor'), kDetalle=findKey('detalle'), kFuente=findKey('fuente'), kTipo=findKey('tipo');
+
+  filas.forEach(fila=>{
+    const fechaStr=String(fila[kFecha]||'').trim(); if (!fechaStr) return;
+    const fecha=parseDate(fechaStr); if (!fecha) return;
+    let ms=String(fila[kMonto]||'').trim();
+    const neg=ms.includes('(')&&ms.includes(')');
+    ms=ms.replace(/[()]/g,'').replace(/\./g,'').replace(',','.').trim();
+    let monto=parseFloat(ms); if (isNaN(monto)) return;
+    if (neg) monto=-monto;
+    RAW.push({
+      fecha, year:fecha.getFullYear(), month:fecha.getMonth()+1, monto,
+      categoria:String(fila[kCategoria]||'').trim()||'Sin categoría',
+      subcategoria:String(fila[kSub]||'').trim()||'Sin subcategoría',
+      detalle:String(fila[kDetalle]||'').trim(),
+      fuente:String(fila[kFuente]||'').trim(),
+      tipo:String(fila[kTipo]||'').trim().toLowerCase()||'gasto'
+    });
+  });
+  YEARS=[...new Set(RAW.map(r=>r.year))].sort();
+}
+
+// Versión nueva de parseInflacion: recibe un array de objetos { anio, mes, variacion }.
+function parseInflacionFilas(filas){
+  INFLACION={};
+  if (!filas.length) return;
+  const keys=Object.keys(filas[0]);
+  const findKey=(needle)=>keys.find(k=>k.toLowerCase().includes(needle));
+  const kAnio=findKey('anio')||findKey('año'), kMes=findKey('mes'), kVar=findKey('variacion')||findKey('ipc');
+  if (!kAnio||!kMes||!kVar) return;
+  filas.forEach(fila=>{
+    const anio=parseInt(fila[kAnio]);const mes=parseInt(fila[kMes]);
+    let vari=fila[kVar]; if (typeof vari==='string') vari=parseFloat(vari.replace(',','.'));
+    if (isNaN(anio)||isNaN(mes)||isNaN(vari)) return;
+    const k=anio+'-'+String(mes).padStart(2,'0');
+    INFLACION[k]=vari;
+  });
+}
 
 function parseCSV(csv) {
   const lines=csv.trim().split('\n');
@@ -2125,7 +2278,8 @@ function renderIngresos(){
 document.addEventListener('click',e=>{if(!e.target.closest('.drop-wrap'))document.querySelectorAll('.dropdown').forEach(d=>d.classList.remove('open'));});
 document.addEventListener('click',e=>{if(!e.target.closest('.th-filter-wrap')){document.querySelectorAll('.col-filter-panel').forEach(p=>p.classList.remove('open'));if(typeof ajustarAlturaFiltro==='function')ajustarAlturaFiltro();}});
 
-loadSheets();
+// loadSheets() ya no se llama automáticamente acá. Ahora se dispara desde
+// iniciarCarga(), que corre recién después de un login exitoso con Google.
 </script>
 </body>
 </html>
