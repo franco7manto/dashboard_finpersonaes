@@ -541,6 +541,7 @@
   <button class="tab-btn" onclick="switchTab(this,'t-fe')">Fondo de emergencia</button>
   <button class="tab-btn" onclick="switchTab(this,'t-deuda')">Control de deuda</button>
   <button class="tab-btn" onclick="switchTab(this,'t-ingresos')">Ingresos</button>
+  <button class="tab-btn" onclick="switchTab(this,'t-cc')">Cuenta corriente</button>
 </div>
 
 <!-- TAB 1: PANEL GENERAL -->
@@ -941,6 +942,89 @@
   </div>
 </div>
 
+<!-- TAB 7: CUENTA CORRIENTE -->
+<div class="tab-content" id="t-cc">
+  <div class="metrics" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">
+    <div class="metric">
+      <div class="metric-label">Saldo actual</div>
+      <div class="metric-value" id="ccSaldo" style="font-size:22px;">—</div>
+      <div class="metric-sub" id="ccSaldoSub">—</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Gastos comunes acumulados</div>
+      <div class="metric-value" id="ccGastosComunes">—</div>
+      <div class="metric-sub">desde que hay reparto registrado</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Cancelaciones registradas</div>
+      <div class="metric-value" id="ccCancelaciones">—</div>
+      <div class="metric-sub" id="ccCancelacionesSub">—</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-head-title">Cómo se calcula el saldo</span></div>
+    <div class="card-body">
+      <p style="font-size:13.5px;color:var(--muted);line-height:1.6;">
+        Por cada gasto común, cada uno debería haber puesto la parte que le corresponde
+        (según el % de reparto). El saldo compara lo que cada uno puso realmente contra
+        lo que le correspondía, y le suma o resta las cancelaciones ya registradas.
+        Un saldo a favor de Franco significa que Luji le debe esa plata, y viceversa.
+      </p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-head-title">Registrar una cancelación</span></div>
+    <div class="card-body">
+      <p style="font-size:12.5px;color:var(--muted);margin:-0.5rem 0 1rem;">Cuando uno le paga al otro para saldar la diferencia, registralo acá. Se guarda en la hoja <strong>Cancelaciones</strong> y ajusta el saldo.</p>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;">
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Fecha</label>
+          <input type="date" id="ccFecha" style="font-family:var(--font-sans);font-size:14px;padding:8px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);background:var(--bg);color:var(--ink);outline:none;"/>
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">De</label>
+          <select id="ccDe" style="font-family:var(--font-sans);font-size:14px;padding:8px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);background:var(--bg);color:var(--ink);outline:none;">
+            <option value="F">Franco</option>
+            <option value="L">Luji</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Para</label>
+          <select id="ccPara" style="font-family:var(--font-sans);font-size:14px;padding:8px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);background:var(--bg);color:var(--ink);outline:none;">
+            <option value="L">Luji</option>
+            <option value="F">Franco</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Monto</label>
+          <input type="number" id="ccMonto" min="0" step="1000" placeholder="Monto"
+            style="width:160px;font-family:var(--font-sans);font-size:14px;padding:8px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);background:var(--bg);color:var(--ink);outline:none;text-align:right;font-variant-numeric:tabular-nums;"/>
+        </div>
+        <button id="ccBtn" onclick="confirmarCancelacion()" style="font-family:var(--font-sans);font-size:13.5px;font-weight:600;padding:9px 20px;border-radius:var(--radius-sm);border:none;background:var(--teal-dark);color:#fff;cursor:pointer;">Registrar</button>
+        <span id="ccStatus" style="font-size:13px;color:var(--muted);padding-bottom:9px;"></span>
+      </div>
+      <div id="ccConfirmBox" style="display:none;margin-top:14px;padding:12px 16px;background:var(--bg-soft);border:1px solid var(--border-strong);border-radius:var(--radius-sm);">
+        <p style="font-size:13.5px;color:var(--ink);margin-bottom:10px;" id="ccConfirmText"></p>
+        <button onclick="registrarCancelacion()" style="font-family:var(--font-sans);font-size:13px;font-weight:600;padding:6px 14px;border-radius:var(--radius-sm);border:none;background:var(--teal-dark);color:#fff;cursor:pointer;margin-right:8px;">Confirmar</button>
+        <button onclick="document.getElementById('ccConfirmBox').style.display='none'" style="font-family:var(--font-sans);font-size:13px;padding:6px 14px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);background:var(--bg);color:var(--ink-soft);cursor:pointer;">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-head-title">Historial de cancelaciones</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table><thead><tr>
+          <th>Fecha</th><th>De</th><th>Para</th><th class="r">Monto</th>
+        </tr></thead><tbody id="ccTbody"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="footer">Dashboard de gastos personales · v10 · datos en vivo desde Google Sheets</div>
 
 <script>
@@ -1243,6 +1327,142 @@ function renderDeuda(){
   renderGraficoPadres();
 }
 
+/* ============================ CUENTA CORRIENTE ============================ */
+
+/**
+ * Calcula y muestra el saldo de la cuenta corriente entre Franco y Luji.
+ *
+ * Fórmula: por cada gasto común (desde el corte de Hogar en adelante),
+ * comparamos lo que cada uno puso realmente (según "Paga") contra lo que
+ * le correspondía poner (según "PctFranco"). La diferencia acumulada,
+ * menos las cancelaciones ya registradas, da el saldo actual.
+ *
+ * Esto SIEMPRE se calcula sobre todo el histórico desde el corte de Hogar,
+ * sin importar el filtro de año/mes que el usuario tenga elegido arriba —
+ * es un saldo real acumulado, no algo que deba cambiar según qué mes estés mirando.
+ */
+function calcularSaldoCC(){
+  const comunes=RAW.filter(r=>
+    r.tipo==='gasto' &&
+    (r.year>HOGAR_DESDE_ANIO || (r.year===HOGAR_DESDE_ANIO && r.month>=HOGAR_DESDE_MES))
+  );
+  let totalComunes=0;
+  // saldo positivo = a favor de Franco (Luji le debe); negativo = a favor de Luji
+  let saldo=0;
+  comunes.forEach(r=>{
+    totalComunes+=r.monto;
+    const leCorrespondeFranco=r.monto*(r.pctFranco/100);
+    const pusoFranco=(r.paga==='F') ? r.monto : 0;
+    // Lo que Franco puso de más (o de menos) respecto a lo que le correspondía
+    saldo += pusoFranco - leCorrespondeFranco;
+  });
+  cancelacionesData.forEach(c=>{
+    // Si Luji le pagó a Franco, eso reduce lo que Luji le debe -> baja el saldo a favor de Franco.
+    if (c.de==='L'&&c.para==='F') saldo -= c.monto;
+    // Si Franco le pagó a Luji, eso reduce lo que Franco le debe -> sube el saldo a favor de Franco.
+    if (c.de==='F'&&c.para==='L') saldo += c.monto;
+  });
+  return { saldo, totalComunes };
+}
+
+function renderCC(){
+  const {saldo,totalComunes}=calcularSaldoCC();
+  const abs=Math.abs(Math.round(saldo));
+  const elSaldo=document.getElementById('ccSaldo');
+  const elSub=document.getElementById('ccSaldoSub');
+  if (abs<1){
+    elSaldo.textContent='$0';
+    elSaldo.style.color='var(--ink)';
+    elSub.textContent='Están al día';
+  } else if (saldo>0){
+    elSaldo.textContent=fmt$(abs);
+    elSaldo.style.color='var(--teal-dark)';
+    elSub.textContent='Luji le debe a Franco';
+  } else {
+    elSaldo.textContent=fmt$(abs);
+    elSaldo.style.color='var(--coral)';
+    elSub.textContent='Franco le debe a Luji';
+  }
+  document.getElementById('ccGastosComunes').textContent=fmt$(totalComunes);
+
+  document.getElementById('ccCancelaciones').textContent=cancelacionesData.length;
+  const totalCancelado=cancelacionesData.reduce((s,c)=>s+c.monto,0);
+  document.getElementById('ccCancelacionesSub').textContent=cancelacionesData.length ? fmt$(totalCancelado)+' en total' : 'todavía no hay';
+
+  const tbody=document.getElementById('ccTbody');
+  if (!tbody) return;
+  tbody.innerHTML='';
+  if (!cancelacionesData.length){
+    tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:1.5rem;">Todavía no registraste cancelaciones.</td></tr>';
+    return;
+  }
+  const nombre=p=>p==='F'?'Franco':(p==='L'?'Luji':p);
+  [...cancelacionesData].reverse().forEach(c=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${fmtFechaCorta(c.fecha)}</td><td>${nombre(c.de)}</td><td>${nombre(c.para)}</td><td class="r mono">${fmt$(c.monto)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// Muestra la caja de confirmación antes de guardar (mismo patrón que otras
+// acciones de escritura: nunca se guarda directo sin que el usuario confirme).
+function confirmarCancelacion(){
+  const fechaInput=document.getElementById('ccFecha').value;
+  const de=document.getElementById('ccDe').value;
+  const para=document.getElementById('ccPara').value;
+  const monto=parseFloat(document.getElementById('ccMonto').value)||0;
+  const status=document.getElementById('ccStatus');
+
+  if (!fechaInput || !monto){
+    status.textContent='Completá fecha y monto';status.style.color='var(--coral,#c0392b)';
+    return;
+  }
+  if (de===para){
+    status.textContent='"De" y "Para" no pueden ser la misma persona';status.style.color='var(--coral,#c0392b)';
+    return;
+  }
+  status.textContent='';
+  const nombre=p=>p==='F'?'Franco':'Luji';
+  document.getElementById('ccConfirmText').textContent=
+    `Vas a registrar que ${nombre(de)} le pagó ${fmt$(monto)} a ${nombre(para)}. ¿Confirmás?`;
+  document.getElementById('ccConfirmBox').style.display='block';
+}
+
+async function registrarCancelacion(){
+  const fechaInput=document.getElementById('ccFecha').value; // YYYY-MM-DD
+  const de=document.getElementById('ccDe').value;
+  const para=document.getElementById('ccPara').value;
+  const monto=parseFloat(document.getElementById('ccMonto').value)||0;
+  const status=document.getElementById('ccStatus');
+  const btn=document.getElementById('ccBtn');
+
+  const partes=fechaInput.split('-');
+  const fecha=partes[2]+'/'+partes[1]+'/'+partes[0];
+
+  document.getElementById('ccConfirmBox').style.display='none';
+  btn.disabled=true;
+  status.textContent='Guardando…';status.style.color='var(--muted)';
+  try {
+    const resp=await fetch(FE_SCRIPT_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({token:authToken,accion:'agregarCancelacion',cancelacion:{fecha,de,para,monto}})
+    });
+    const data=await resp.json();
+    if (data.error==='No autorizado') { mostrarAccesoDenegado_(); return; }
+    if (!data.ok) throw new Error(data.error||'respuesta inesperada');
+    cancelacionesData.push({fecha,de,para,monto});
+    document.getElementById('ccMonto').value='';
+    document.getElementById('ccFecha').value='';
+    status.textContent='Cancelación registrada';status.style.color='var(--teal-dark)';
+    renderCC();
+  } catch(e){
+    status.textContent='Error al guardar: '+e.message;status.style.color='var(--coral,#c0392b)';
+  } finally {
+    btn.disabled=false;
+  }
+}
+
 // Gráfico de evolución de la deuda de padres: línea real (histórico) + proyección punteada
 function renderGraficoPadres(){
   const canvas=document.getElementById('cDeudaPadres');
@@ -1467,7 +1687,9 @@ function aplicarFEyDeuda_(data){
   deudaPadresData=data.deudaPadres||[];
   deudaSantanderData=data.deudaSantander||{};
   pagosPadresData=data.pagosPadres||[];
+  cancelacionesData=data.cancelaciones||[];
   renderDeuda();
+  renderCC();
 }
 
 // Guarda la config actual en Sheets vía el Apps Script (autenticado)
@@ -2149,6 +2371,7 @@ let feConfigLoaded=false; // ya se cargó la config desde Sheets
 let deudaPadresData=[];
 let deudaSantanderData={};
 let pagosPadresData=[];
+let cancelacionesData=[];
 let cDeudaPadresChart=null;
 
 // Marca que hay cambios sin guardar y actualiza el botón
