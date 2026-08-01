@@ -1164,6 +1164,27 @@ function totalSantander(){
 
 // Render principal de la tab de deuda
 function renderDeuda(){
+  // La deuda (padres + Santander) es 100% de Franco. En vista Luji no
+  // le corresponde nada, así que mostramos todo en $0 sin calcular nada.
+  if (vistaActual==='L'){
+    document.getElementById('dTotal').textContent=fmt$(0);
+    document.getElementById('dTotalSub').textContent='esta deuda es de Franco';
+    document.getElementById('dPadres').textContent=fmt$(0);
+    document.getElementById('dPadresSub').textContent='—';
+    document.getElementById('dSantander').textContent=fmt$(0);
+    document.getElementById('dSantanderSub').textContent='—';
+    document.getElementById('dMeses').textContent='—';
+    document.getElementById('dMesesSub').textContent='—';
+    document.getElementById('dProximo').textContent='—';
+    document.getElementById('dProximoSub').textContent='—';
+    document.getElementById('santSaldo').textContent=fmt$(0);
+    document.getElementById('santTbody').innerHTML='';
+    const pagosTbody=document.getElementById('pagosTbody');
+    if (pagosTbody) pagosTbody.innerHTML='<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:20px;">Esta deuda es 100% de Franco — cambiá a esa vista o a Hogar para verla.</td></tr>';
+    if (cDeudaPadresChart) { cDeudaPadresChart.destroy(); cDeudaPadresChart=null; }
+    return;
+  }
+
   const sPadres=saldoPadres();
   const sSant=totalSantander();
   const total=sPadres+sSant;
@@ -1736,7 +1757,7 @@ function applyFilters(){
   DATA=conVista.filter(r=>r.tipo==='gasto');
   DATA_ING=conVista.filter(r=>r.tipo==='ingreso');
   DATA_INV=conVista.filter(r=>r.tipo==='inversión'||r.tipo==='inversion');
-  updateHeader();renderMetrics();buildC1();buildC2();buildC3();renderTable();renderAnalisis();renderFE();renderIngresos();
+  updateHeader();renderMetrics();buildC1();buildC2();buildC3();renderTable();renderAnalisis();renderFE();renderIngresos();renderDeuda();
 }
 
 function updateHeader(){
@@ -1776,14 +1797,12 @@ function renderMetrics(){
 let c1Chart;
 function buildC1(){
   const bk={};
-  RAW.forEach(r=>{
-    if (filteredYear&&String(r.year)!==filteredYear) return;
+  const agregar=(lista,campo)=>lista.forEach(r=>{
     const k=r.year+'-'+String(r.month).padStart(2,'0');
     if (!bk[k]) bk[k]={gasto:0,ingreso:0,inversion:0};
-    if (r.tipo==='gasto') bk[k].gasto+=r.monto;
-    if (r.tipo==='ingreso') bk[k].ingreso+=r.monto;
-    if (r.tipo==='inversión'||r.tipo==='inversion') bk[k].inversion+=r.monto;
+    bk[k][campo]+=r.monto;
   });
+  agregar(DATA,'gasto'); agregar(DATA_ING,'ingreso'); agregar(DATA_INV,'inversion');
   const keys=Object.keys(bk).sort();
   const labels=keys.map(k=>{const[y,m]=k.split('-');return MESES_LABEL[parseInt(m)-1]+(YEARS.length>1?' '+y:'');});
   const gastos=keys.map(k=>Math.round(bk[k].gasto));
@@ -2023,9 +2042,8 @@ function renderAnalisis(){
   });
   document.getElementById('anEvolTitle').textContent=`Evolución mensual — ${cat}`;
   const eb={};
-  RAW.forEach(r=>{
-    if (filteredYear&&String(r.year)!==filteredYear) return;
-    if (r.tipo!=='gasto'||r.categoria!==cat) return;
+  DATA.forEach(r=>{
+    if (r.categoria!==cat) return;
     const k=r.year+'-'+String(r.month).padStart(2,'0');
     eb[k]=(eb[k]||0)+r.monto;
   });
@@ -2292,9 +2310,7 @@ function renderIngresos(){
 
   // Gráfico 1: evolución mensual de ingresos + inflación opcional
   const bk={};
-  RAW.forEach(r=>{
-    if (filteredYear&&String(r.year)!==filteredYear) return;
-    if (r.tipo!=='ingreso') return;
+  DATA_ING.forEach(r=>{
     const k=r.year+'-'+String(r.month).padStart(2,'0');
     bk[k]=(bk[k]||0)+r.monto;
   });
