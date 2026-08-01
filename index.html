@@ -1508,11 +1508,19 @@ function parseFilas(filas){
   filas.forEach(fila=>{
     const fechaStr=String(fila[kFecha]||'').trim(); if (!fechaStr) return;
     const fecha=parseDate(fechaStr); if (!fecha) return;
-    let ms=String(fila[kMonto]||'').trim();
-    const neg=ms.includes('(')&&ms.includes(')');
-    ms=ms.replace(/[()]/g,'').replace(/\./g,'').replace(',','.').trim();
-    let monto=parseFloat(ms); if (isNaN(monto)) return;
-    if (neg) monto=-monto;
+    const montoRaw=fila[kMonto];
+    let monto;
+    if (typeof montoRaw==='number') {
+      // Ya viene como número (Apps Script lo manda así si la celda es numérica).
+      monto=montoRaw;
+    } else {
+      let ms=String(montoRaw||'').trim();
+      const neg=ms.includes('(')&&ms.includes(')');
+      ms=ms.replace(/[()]/g,'').replace(/\./g,'').replace(',','.').trim();
+      monto=parseFloat(ms);
+      if (neg) monto=-monto;
+    }
+    if (isNaN(monto)) return;
     RAW.push({
       fecha, year:fecha.getFullYear(), month:fecha.getMonth()+1, monto,
       categoria:String(fila[kCategoria]||'').trim()||'Sin categoría',
@@ -1601,6 +1609,13 @@ function parseDate(s) {
   }
   if ((m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/)))
     return new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3]));
+  // Formato ISO con hora, ej. "2025-01-01T03:00:00.000Z" (por si el Apps
+  // Script devuelve un objeto Date sin pasar por formatearFecha del lado
+  // del servidor). Tomamos la fecha en UTC para que no se corra un día
+  // para atrás/adelante según la zona horaria del navegador.
+  if ((m=s.match(/^(\d{4})-(\d{2})-(\d{2})T/))) {
+    return new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3]));
+  }
   return null;
 }
 
