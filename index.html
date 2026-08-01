@@ -1006,20 +1006,25 @@ window.onload = function(){
 // básicos del usuario, y ESE access_token es lo que mandamos al Apps Script
 // para que lo valide del lado del servidor.
 async function onGoogleLogin(tokenResponse){
+  console.log('DIAG: onGoogleLogin se ejecutó. tokenResponse =', tokenResponse);
   if (tokenResponse.error) {
+    console.log('DIAG: tokenResponse tiene error =', tokenResponse.error);
     document.getElementById('loginDenied').style.display='block';
     document.querySelector('#loginDenied p').textContent='No se pudo completar el login: '+tokenResponse.error;
     return;
   }
   authToken = tokenResponse.access_token;
+  console.log('DIAG: authToken seteado =', authToken);
   document.getElementById('loginDenied').style.display='none';
   try {
     const resp = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { 'Authorization': 'Bearer '+authToken }
     });
     const datosUsuario = await resp.json();
+    console.log('DIAG: userinfo respondió =', datosUsuario);
     mostrarUserBar_(datosUsuario);
   } catch(e) {
+    console.log('DIAG: excepción pidiendo userinfo =', e);
     mostrarUserBar_({});
   }
   iniciarCarga();
@@ -1364,10 +1369,13 @@ async function registrarPago(){
 // Carga TODO desde el Apps Script autenticado: datos, inflación, FE, deuda.
 // Reemplaza a la vieja loadSheets() que leía CSV público directo de Sheets.
 async function loadSheets() {
+  console.log('DIAG: loadSheets arrancó con authToken =', authToken);
   try {
     const resp=await fetch(`${FE_SCRIPT_URL}?token=${encodeURIComponent(authToken)}`);
+    console.log('DIAG: respuesta HTTP del Apps Script, status =', resp.status);
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     const data=await resp.json();
+    console.log('DIAG: JSON completo del Apps Script =', data);
     if (data.error==='No autorizado') { mostrarAccesoDenegado_(); return; }
     if (data.error) throw new Error(data.error);
 
@@ -1378,6 +1386,7 @@ async function loadSheets() {
 
     aplicarFEyDeuda_(data);
   } catch(e) {
+    console.log('DIAG: excepción en loadSheets =', e);
     document.getElementById('loadingMsg').style.display='none';
     document.getElementById('errorBox').style.display='block';
     document.getElementById('errorMsg').textContent='No se pudo cargar la planilla. ('+e.message+')';
