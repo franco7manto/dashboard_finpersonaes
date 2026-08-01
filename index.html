@@ -502,6 +502,11 @@
     <p id="headerSub">Cargando…</p>
   </div>
   <div class="header-right">
+    <div class="toggle-group vista-toggle">
+      <button class="active" data-vista="F" onclick="setVista('F')">Franco</button>
+      <button data-vista="L" onclick="setVista('L')">Luji</button>
+      <button data-vista="H" onclick="setVista('H')">Hogar</button>
+    </div>
     <div id="userBar" style="display:none"></div>
     <select id="selAnio" onchange="applyFilters()"><option value="">Todos los años</option></select>
     <div class="drop-wrap" id="mesDrop">
@@ -966,6 +971,13 @@ let INFLACION={}; // { 'YYYY-MM': variacionMensual% }
 let filteredYear='';
 let tableSort={col:'total',asc:false};
 let tableFilters={cat:null,sub:null};
+
+// Vista activa: 'F' (Franco), 'L' (Luji), o 'H' (Hogar consolidado).
+let vistaActual='F';
+// El historial de "Hogar" arranca en agosto 2026 (antes de eso los gastos
+// compartidos no estaban registrados con reparto, así que no tiene sentido
+// consolidarlos como hogar).
+const HOGAR_DESDE_ANIO=2026, HOGAR_DESDE_MES=8;
 
 const fmt$=v=>'$'+Math.round(v).toLocaleString('es-AR');
 const fmtEjeY=v=>{const abs=Math.abs(v);if(abs>=1000000)return '$'+(v/1000000).toLocaleString('es-AR',{maximumFractionDigits:1})+'M';if(abs>=1000)return '$'+(v/1000).toFixed(0)+'K';return '$'+v;};
@@ -1494,7 +1506,8 @@ function parseFilas(filas){
   const keys=Object.keys(filas[0]);
   const findKey=(needle)=>keys.find(k=>k.toLowerCase().includes(needle));
   const kFecha=findKey('fecha'), kMonto=findKey('monto'), kCategoria=findKey('categor'),
-        kSub=findKey('subcategor'), kDetalle=findKey('detalle'), kFuente=findKey('fuente'), kTipo=findKey('tipo');
+        kSub=findKey('subcategor'), kDetalle=findKey('detalle'), kFuente=findKey('fuente'), kTipo=findKey('tipo'),
+        kPaga=keys.find(k=>k.toLowerCase()==='paga'), kPct=keys.find(k=>k.toLowerCase()==='pctfranco');
 
   filas.forEach(fila=>{
     const fechaStr=String(fila[kFecha]||'').trim(); if (!fechaStr) return;
@@ -1512,13 +1525,21 @@ function parseFilas(filas){
       if (neg) monto=-monto;
     }
     if (isNaN(monto)) return;
+    // Quién pagó ('F' o 'L') y qué % le corresponde a Franco del gasto (0-100).
+    // Si faltan (filas viejas o mal cargadas), default seguro: Franco 100%.
+    const pagaRaw=String(fila[kPaga]||'F').trim().toUpperCase();
+    const paga=(pagaRaw==='L'||pagaRaw==='LUJI')?'L':'F';
+    let pctFranco=Number(fila[kPct]);
+    if (isNaN(pctFranco)) pctFranco=100;
+    pctFranco=Math.min(100,Math.max(0,pctFranco));
     RAW.push({
       fecha, year:fecha.getFullYear(), month:fecha.getMonth()+1, monto,
       categoria:String(fila[kCategoria]||'').trim()||'Sin categoría',
       subcategoria:String(fila[kSub]||'').trim()||'Sin subcategoría',
       detalle:String(fila[kDetalle]||'').trim(),
       fuente:String(fila[kFuente]||'').trim(),
-      tipo:String(fila[kTipo]||'').trim().toLowerCase()||'gasto'
+      tipo:String(fila[kTipo]||'').trim().toLowerCase()||'gasto',
+      paga, pctFranco
     });
   });
   YEARS=[...new Set(RAW.map(r=>r.year))].sort();
@@ -1658,6 +1679,49 @@ function updateMesBadge(sel){
   else badge.textContent=sel.length+' meses ▾';
 }
 
+/**
+ * Núcleo de la vista Franco/Luji/Hogar. Recibe las filas ya filtradas por
+ * año/mes (RAW filtrado) y devuelve una nueva lista con el monto ajustado
+ * según la vista activa. El resto del dashboard (gráficos, tablas, FE,
+ * deuda) sigue trabajando con "monto" sin saber que existe el reparto.
+ *
+ * - Vista Franco / Luji:
+ *   · Gastos: se reparten según PctFranco (0-100), sin importar quién pagó.
+ *     Esto refleja "lo que me corresponde pagar", no "lo que puse de mi bolsillo".
+ *   · Ingresos e inversiones: NO se reparten por porcentaje — son individuales.
+ *     Se usa directo la columna Paga: si es mío, cuenta 100%; si es de la
+ *     otra persona, cuenta $0 en mi vista. PctFranco se ignora para estos casos.
+ * - Vista Hogar: el monto completo (100%) de cada fila, sin dividir —
+ *   gastos e ingresos por igual — pero solo a partir de HOGAR_DESDE_ANIO/MES.
+ */
+function aplicarVista(filas){
+  if (vistaActual==='H'){
+    return filas
+      .filter(r=>r.year>HOGAR_DESDE_ANIO || (r.year===HOGAR_DESDE_ANIO && r.month>=HOGAR_DESDE_MES))
+      .map(r=>r); // monto ya es el 100%, no hace falta tocarlo
+  }
+  const esPersonal=r=>r.tipo==='ingreso'||r.tipo==='inversión'||r.tipo==='inversion';
+  return filas.map(r=>{
+    let frac;
+    if (esPersonal(r)){
+      // Ingresos/inversiones: individuales, se miran por quién los cobró (Paga).
+      frac=(r.paga===vistaActual) ? 1 : 0;
+    } else {
+      // Gastos: se reparten según PctFranco.
+      frac=vistaActual==='F' ? r.pctFranco/100 : (100-r.pctFranco)/100;
+    }
+    return {...r, monto:r.monto*frac};
+  });
+}
+
+function setVista(vista){
+  vistaActual=vista;
+  document.querySelectorAll('.vista-toggle button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.vista===vista);
+  });
+  applyFilters();
+}
+
 function applyFilters(){
   filteredYear=document.getElementById('selAnio').value;
   const selMeses=getSelectedMeses();
@@ -1668,9 +1732,10 @@ function applyFilters(){
     if (fm&&!selMeses.includes(String(r.month))) return false;
     return true;
   });
-  DATA=filtered.filter(r=>r.tipo==='gasto');
-  DATA_ING=filtered.filter(r=>r.tipo==='ingreso');
-  DATA_INV=filtered.filter(r=>r.tipo==='inversión'||r.tipo==='inversion');
+  const conVista=aplicarVista(filtered);
+  DATA=conVista.filter(r=>r.tipo==='gasto');
+  DATA_ING=conVista.filter(r=>r.tipo==='ingreso');
+  DATA_INV=conVista.filter(r=>r.tipo==='inversión'||r.tipo==='inversion');
   updateHeader();renderMetrics();buildC1();buildC2();buildC3();renderTable();renderAnalisis();renderFE();renderIngresos();
 }
 
